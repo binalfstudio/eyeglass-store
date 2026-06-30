@@ -52,6 +52,9 @@ const isOriginAllowed = (origin) => {
   const allowed = getAllowedClientOrigins();
   if (allowed.has(origin)) return true;
   if (process.env.NODE_ENV !== 'production' && isLocalOrigin(origin)) return true;
+  // Allow Railway deployment domains automatically
+  if (/^https?:\/\/[a-zA-Z0-9-]+\.railway\.app$/.test(origin)) return true;
+  if (/^https?:\/\/[a-zA-Z0-9-]+\.up\.railway\.app$/.test(origin)) return true;
   return false;
 };
 
