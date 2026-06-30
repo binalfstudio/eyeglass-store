@@ -24,6 +24,7 @@
     "africastalking": "^0.7.9",
     "bcryptjs": "^3.0.3",
     "body-parser": "^2.2.2",
+    "cloudinary": "^2.10.0",
     "concurrently": "^9.2.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",

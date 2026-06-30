@@ -529,44 +529,98 @@
 }
 /* ≤768px: collapse nav into hamburger */
 @media (max-width: 768px) {
-  /* Grid becomes: logo | spacer | actions */
   .header-container {
     grid-template-columns: auto 1fr auto;
   }
 
   .desktop-nav { display: none; }
-
   .mobile-menu-btn { display: flex; }
-
-  /* Show backdrop and drawer only when Framer Motion renders them */
   .mobile-backdrop,
   .mobile-menu { display: flex; }
 
-  /* Hide user section text on mobile — keep avatar only */
-  .user-section { display: none; }
+  /* On mobile: hide the user name + logout btn, but keep the avatar visible */
+  .user-section .user-name,
+  .user-section .logout-btn { display: none; }
+
+  /* Keep profile chip but make it compact (avatar only) */
+  .user-section {
+    display: flex;
+    padding-left: 0;
+    border-left: none;
+  }
+
+  .profile-chip {
+    padding: 0.15rem;
+    max-width: 40px;
+    gap: 0;
+  }
 }
 
 /* ≤480px: tighten spacing further */
 @media (max-width: 480px) {
   .header-container {
-    padding-inline: 0.75rem;
-    gap: 0.25rem;
+    padding-inline: 0.5rem;
+    gap: 0.2rem;
   }
 
-  .logo-text { font-size: 0.9rem; }
-  .logo-icon { width: 36px; height: 36px; min-width: 36px; border-radius: 10px; }
+  .logo-text { font-size: 0.85rem; }
+  .logo-icon { width: 34px; height: 34px; min-width: 34px; border-radius: 10px; }
 
-  /* Keep only: logo | — | cart + bell + hamburger */
+  /* Slightly smaller action buttons to fit more items */
+  .action-btn, .cart-btn, .mobile-menu-btn {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+  }
+
+  /* Always show: lang + cart + bell + profile + hamburger */
   .action-btn.notif-btn,
   .cart-btn,
   .mobile-menu-btn { display: flex; }
 }
 
-/* ≤360px: absolute minimum — hide notification bell, show only cart + hamburger */
+/* ≤360px (Samsung Galaxy A10e): show everything, just smaller */
 @media (max-width: 360px) {
-  .notif-wrap { display: none; }
+  /* Keep the notification bell — do NOT hide it */
+  .notif-wrap { display: block; }
+
+  .header-container {
+    padding-inline: 0.4rem;
+    gap: 0.15rem;
+  }
+
+  /* Hide logo text to free space */
   .logo-text  { display: none; }
-  .logo-icon  { width: 34px; height: 34px; min-width: 34px; }
+  .logo-icon  { width: 32px; height: 32px; min-width: 32px; border-radius: 9px; }
+
+  /* Smaller buttons to fit everything in 360px */
+  .action-btn, .cart-btn, .mobile-menu-btn {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    border-radius: 9px;
+  }
+
+  .profile-chip {
+    width: 34px;
+    height: 34px;
+    max-width: 34px;
+    padding: 0.1rem;
+  }
+
+  .header-avatar {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+  }
+
+  /* Language switcher: extra compact */
+  .lang-btn {
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0.2rem 0.35rem;
+    font-size: 0.65rem;
+  }
 }
 
 /* ════════════════════════════════════════════════════════

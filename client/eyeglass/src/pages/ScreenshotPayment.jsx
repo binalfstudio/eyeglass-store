@@ -17,6 +17,13 @@ const SERVER_BASE = API_BASE_URL.startsWith('http')
   ? API_BASE_URL.replace(/\/api\/?$/, '')
   : ''   // empty string → relative URL (works via Vite proxy)
 
+// If path is already a full Cloudinary URL, use it as-is
+const toImgUrl = (p) => {
+  if (!p) return ''
+  if (p.startsWith('http://') || p.startsWith('https://')) return p
+  return `${SERVER_BASE}${p}`
+}
+
 // ── Bank / payment details shown to the user ────────────────────────────────
 const BANK_INFO = [
   { icon: Building2, label: 'Bank',           value: 'Commercial Bank of Ethiopia (CBE)' },
@@ -338,7 +345,7 @@ export default function ScreenshotPayment() {
                     >
                       {/* thumbnail */}
                       <img
-                        src={`${SERVER_BASE}${sub.screenshot_path}`}
+                        src={toImgUrl(sub.screenshot_path)}
                         alt="screenshot"
                         className="sp-sub-thumb"
                         onError={(e) => { e.target.style.display = 'none' }}

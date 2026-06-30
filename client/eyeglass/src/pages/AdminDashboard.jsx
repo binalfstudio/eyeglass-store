@@ -7,7 +7,12 @@ import { API_BASE_URL } from '../utils/apiConfig';
 const SERVER_BASE = API_BASE_URL.startsWith('http')
   ? API_BASE_URL.replace(/\/api\/?$/, '')
   : ''
-const toServerUrl = (p) => (p ? `${SERVER_BASE}${p}` : '')
+// If path is already a full URL (Cloudinary), return it as-is
+const toServerUrl = (p) => {
+  if (!p) return ''
+  if (p.startsWith('http://') || p.startsWith('https://')) return p
+  return `${SERVER_BASE}${p}`
+}
 
 import { 
   LayoutDashboard, 

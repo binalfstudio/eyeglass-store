@@ -297,9 +297,9 @@ const Header = () => {
               </div>
             )}
 
-            {/* User avatar — desktop only */}
+            {/* User avatar — always visible, compact on mobile */}
             {user ? (
-              <div className="user-section hide-on-mobile">
+              <div className="user-section">
                 <button
                   type="button"
                   className="profile-chip"
@@ -324,7 +324,7 @@ const Header = () => {
               </div>
             ) : (
               <motion.button
-                className="action-btn user-btn hide-on-mobile"
+                className="action-btn user-btn"
                 whileHover={{ scale: 1.07 }}
                 whileTap={{ scale: 0.93 }}
                 onClick={() => navigate('/login')}

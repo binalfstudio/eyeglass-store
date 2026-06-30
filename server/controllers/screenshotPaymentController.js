@@ -2,22 +2,15 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { getConnection } = require('../config/mysql');
+const { uploadToCloudinary, isCloudinaryConfigured } = require('../utils/cloudinaryUpload');
 
 // ---------------------------------------------------------------------------
-// Multer config — store screenshots on disk
+// Multer config — use memoryStorage so we can upload to Cloudinary OR disk
 // ---------------------------------------------------------------------------
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads', 'payment-screenshots');
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-    cb(null, `pay-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-  },
-});
 
 const fileFilter = (_req, file, cb) => {
   const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -28,14 +21,33 @@ const fileFilter = (_req, file, cb) => {
   }
 };
 
+// Always use memoryStorage — we decide where to store after upload
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
 });
 
 // Export the middleware so routes can use it
 const uploadScreenshotMiddleware = upload.single('screenshot');
+
+// ---------------------------------------------------------------------------
+// Save uploaded file — Cloudinary in production, disk in dev
+// ---------------------------------------------------------------------------
+const saveUploadedFile = async (file) => {
+  if (isCloudinaryConfigured()) {
+    // Upload to Cloudinary — returns a permanent https:// URL
+    const url = await uploadToCloudinary(file.buffer, file.originalname);
+    return url; // full URL, stored directly in DB
+  }
+
+  // Fallback: save to local disk (development only)
+  const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+  const filename = `pay-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+  const filePath = path.join(UPLOADS_DIR, filename);
+  fs.writeFileSync(filePath, file.buffer);
+  return `/uploads/payment-screenshots/${filename}`; // relative path
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -136,8 +148,6 @@ const submitScreenshotPayment = async (req, res) => {
 
     const cartItems = await getUserCart(connection, req.user.id);
     if (!cartItems.length) {
-      // Remove the uploaded file — nothing to do
-      fs.unlink(req.file.path, () => {});
       return res.status(400).json({ message: 'Your cart is empty' });
     }
 
@@ -145,7 +155,6 @@ const submitScreenshotPayment = async (req, res) => {
       (i) => Number(i.quantity_in_stock) < Number(i.quantity)
     );
     if (outOfStock) {
-      fs.unlink(req.file.path, () => {});
       return res.status(400).json({
         message: `${outOfStock.name} does not have enough stock`,
       });
@@ -153,11 +162,17 @@ const submitScreenshotPayment = async (req, res) => {
 
     const totals = calculateTotals(cartItems);
     if (totals.total <= 0) {
-      fs.unlink(req.file.path, () => {});
       return res.status(400).json({ message: 'Order total must be greater than zero' });
     }
 
-    // Insert order
+    // Save file to Cloudinary (production) or disk (development)
+    let screenshotPath;
+    try {
+      screenshotPath = await saveUploadedFile(req.file);
+    } catch (uploadErr) {
+      console.error('File upload failed:', uploadErr);
+      return res.status(500).json({ message: 'Failed to upload screenshot. Please try again.' });
+    }
     const orderResult = await new Promise((resolve, reject) => {
       connection.query(
         `INSERT INTO orders (user_id, status, currency, subtotal, shipping, tax, total)
@@ -186,8 +201,7 @@ const submitScreenshotPayment = async (req, res) => {
       [orderItemValues]
     );
 
-    // Store screenshot record
-    const screenshotPath = `/uploads/payment-screenshots/${path.basename(req.file.path)}`;
+    // Store screenshot record (screenshotPath already set above via saveUploadedFile)
     await runQuery(
       connection,
       `INSERT INTO payment_screenshots
@@ -223,6 +237,7 @@ const submitScreenshotPayment = async (req, res) => {
     });
   } catch (error) {
     console.error('Error in submitScreenshotPayment:', error);
+    // If using local disk and file was saved, clean it up
     if (req.file?.path) {
       fs.unlink(req.file.path, () => {});
     }
