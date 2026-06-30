@@ -1,4 +1,4 @@
-const { getConnection } = require('../config/mysql');
+const { getConnection, getDatabaseError } = require('../config/mysql');
 
 // @desc    Get all categories
 // @route   GET /api/categories
@@ -6,12 +6,20 @@ const { getConnection } = require('../config/mysql');
 const getCategories = async (req, res) => {
   try {
     const connection = getConnection();
+    if (!connection) {
+      const dbError = getDatabaseError();
+      return res.status(503).json({
+        message: 'Database not connected',
+        detail: dbError?.message || 'MySQL connection is not available',
+      });
+    }
+
     const query = 'SELECT * FROM categories ORDER BY name ASC';
     
     connection.query(query, (err, results) => {
       if (err) {
         console.error('Error fetching categories:', err);
-        return res.status(500).json({ message: 'Error fetching categories' });
+        return res.status(500).json({ message: 'Error fetching categories', detail: err.message });
       }
       res.json(results);
     });

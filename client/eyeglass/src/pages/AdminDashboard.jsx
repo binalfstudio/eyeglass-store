@@ -1,6 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+
+// Derive server base URL for static assets (works via Vite proxy when relative)
+const _API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const SERVER_BASE = _API_BASE.startsWith('http') ? _API_BASE.replace(/\/api\/?$/, '') : ''
+const toServerUrl = (p) => (p ? `${SERVER_BASE}${p}` : '')
+
 import { 
   LayoutDashboard, 
   Package, 
@@ -23,7 +29,8 @@ import {
   Camera,
   UserCircle2,
   ShieldCheck,
-  Bell
+  Bell,
+  Menu,
 } from 'lucide-react';
 import './AdminDashboard.css';
 
@@ -72,8 +79,12 @@ const normalizeListPayload = (payload, preferredKeys = []) => {
   return [];
 };
 
+// Defined outside component so useMemo deps are stable (no new array each render)
+const PAID_STATUSES = ['paid', 'shipped', 'completed'];
+
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -106,6 +117,12 @@ const AdminDashboard = () => {
   const [notifications, setNotifications] = useState([]);
   const [orders, setOrders] = useState([]);
   const [adminUsers, setAdminUsers] = useState([]);
+  const [screenshotPayments, setScreenshotPayments] = useState([]);
+  const [screenshotStatusFilter, setScreenshotStatusFilter] = useState('all');
+  const [reviewingScreenshotId, setReviewingScreenshotId] = useState(null);
+  const [adminNoteInput, setAdminNoteInput] = useState('');
+  const [screenshotReviewLoading, setScreenshotReviewLoading] = useState(false);
+  const [previewScreenshot, setPreviewScreenshot] = useState(null);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState([]);
@@ -129,6 +146,27 @@ const AdminDashboard = () => {
   const [profileStatus, setProfileStatus] = useState('');
   const [profileError, setProfileError] = useState('');
   const [bootMessage, setBootMessage] = useState('');
+
+  const [animatedStats, setAnimatedStats] = useState({
+    totalRevenue: 0,
+    collectedRevenue: 0,
+    activeCustomers: 0,
+    orders: 0,
+    pendingOrders: 0,
+    uncollectedRevenue: 0,
+    lowStockProducts: 0,
+  });
+  const [statTrends, setStatTrends] = useState({
+    totalRevenue: 'neutral',
+    collectedRevenue: 'neutral',
+    activeCustomers: 'neutral',
+    orders: 'neutral',
+    pendingOrders: 'neutral',
+    uncollectedRevenue: 'neutral',
+    lowStockProducts: 'neutral',
+  });
+  const previousTargetsRef = useRef(null);
+  const trendResetRef = useRef(null);
 
   const navigate = useNavigate();
 
@@ -194,7 +232,20 @@ const AdminDashboard = () => {
           return;
         }
 
-        setUser((prev) => ({ ...prev, ...profileData, isAdmin: profileAdminState ?? prev?.isAdmin ?? false }));
+        setUser((prev) => {
+          const nextUser = {
+            ...prev,
+            ...profileData,
+            isAdmin: profileAdminState ?? prev?.isAdmin ?? Boolean(profileData.isAdmin),
+          };
+          try {
+            localStorage.setItem('user', JSON.stringify(nextUser));
+            window.dispatchEvent(new Event('auth-change'));
+          } catch {
+            // ignore storage failures
+          }
+          return nextUser;
+        });
         setProfileForm({
           name: profileData.name || '',
           email: profileData.email || '',
@@ -250,15 +301,30 @@ const AdminDashboard = () => {
           }))
         );
       }
+
+      // Fetch screenshot payments
+      const screenshotRes = await fetch('/api/screenshot-payments/admin/list', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (screenshotRes.ok) {
+        const screenshotData = await screenshotRes.json();
+        setScreenshotPayments(Array.isArray(screenshotData) ? screenshotData : []);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
-      setBootMessage('Failed to load admin data. Please refresh and try again.');
+      setBootMessage('Failed to load admin data. Make sure the backend is running on port 5000, then refresh.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const unreadNotificationsCount = notifications.filter((item) => !item.is_read).length;
+
+  const pendingScreenshotCount = screenshotPayments.filter((item) => item.status === 'pending').length;
+
+  const displayScreenshotPayments = screenshotStatusFilter === 'all'
+    ? screenshotPayments
+    : screenshotPayments.filter((item) => item.status === screenshotStatusFilter);
 
   const handleMarkNotificationAsRead = async (notificationId) => {
     const token = localStorage.getItem('token');
@@ -311,6 +377,18 @@ const AdminDashboard = () => {
           Number(metadata?.orderId) ||
           Number(metadata?.internalOrderId) ||
           null,
+      };
+    }
+
+    if (
+      type === 'screenshot_payment_submitted' ||
+      type === 'screenshot_payment_approved' ||
+      type === 'screenshot_payment_rejected'
+    ) {
+      return {
+        tab: 'screenshot-payments',
+        label: 'Review Screenshot Payments',
+        orderId: Number(metadata?.orderId) || null,
       };
     }
 
@@ -459,6 +537,7 @@ const AdminDashboard = () => {
         return;
       }
 
+      // Optimistic local update, then re-sync orders + notifications only
       setOrders((prev) =>
         prev.map((order) =>
           Number(order.id) === Number(orderId)
@@ -466,7 +545,7 @@ const AdminDashboard = () => {
             : order
         )
       );
-      fetchData(token);
+      await Promise.all([refetchOrders(token), refetchNotifications(token)]);
     } catch (error) {
       console.error('Error updating order status:', error);
       alert('Failed to update order status');
@@ -487,11 +566,11 @@ const AdminDashboard = () => {
   const handleToggleSelectAllVisible = () => {
     setSelectedOrderIds((prev) => {
       if (!allVisibleOrderIds.length) return prev;
-
-      if (areAllVisibleOrdersSelected) {
+      // Recompute inside setter to avoid stale closure
+      const allSelected = allVisibleOrderIds.every((id) => prev.includes(id));
+      if (allSelected) {
         return prev.filter((id) => !allVisibleOrderIds.includes(id));
       }
-
       const next = new Set(prev);
       allVisibleOrderIds.forEach((id) => next.add(id));
       return Array.from(next);
@@ -522,19 +601,109 @@ const AdminDashboard = () => {
         return;
       }
 
+      // Optimistic local update, then re-sync orders + notifications only
       setOrders((prev) =>
         prev.map((order) =>
           selectedOrderIds.includes(Number(order.id)) ? { ...order, status: bulkOrderStatus } : order
         )
       );
       setSelectedOrderIds([]);
-      fetchData(token);
+      await Promise.all([refetchOrders(token), refetchNotifications(token)]);
     } catch (error) {
       console.error('Error bulk updating order statuses:', error);
       alert('Bulk update failed');
     } finally {
       setIsBulkUpdatingOrders(false);
     }
+  };
+
+  const handleReviewScreenshotPayment = async (screenshotId, action) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    setScreenshotReviewLoading(true);
+    try {
+      const response = await fetch(`/api/screenshot-payments/admin/${screenshotId}/review`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action, adminNote: adminNoteInput }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data?.message || 'Failed to review screenshot payment');
+        return;
+      }
+
+      // Optimistic local update
+      setScreenshotPayments((prev) =>
+        prev.map((item) =>
+          item.id === screenshotId
+            ? { ...item, status: data.status, admin_note: adminNoteInput, reviewed_at: new Date().toISOString() }
+            : item
+        )
+      );
+      setReviewingScreenshotId(null);
+      setAdminNoteInput('');
+      // Only re-fetch orders (status changed) + notifications + screenshots
+      await Promise.all([
+        refetchOrders(token),
+        refetchScreenshots(token),
+        refetchNotifications(token),
+      ]);
+    } catch (error) {
+      console.error('Error reviewing screenshot payment:', error);
+      alert('Failed to review screenshot payment');
+    } finally {
+      setScreenshotReviewLoading(false);
+    }
+  };
+
+  // Targeted re-fetch helpers — avoid re-loading 7 endpoints after each mutation
+  const refetchOrders = async (token) => {
+    try {
+      const res = await fetch('/api/payments/admin/orders', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const raw = Array.isArray(data) ? data : Array.isArray(data?.orders) ? data.orders : [];
+        setOrders(raw.map((order) => ({
+          ...order,
+          id: Number(order?.id) || order?.id,
+          status: normalizeOrderStatus(order?.status),
+          payment_status: normalizePaymentStatus(order?.payment_status),
+          created_at: order?.created_at || order?.createdAt || null,
+        })));
+      }
+    } catch (e) { console.error('refetchOrders:', e); }
+  };
+
+  const refetchScreenshots = async (token) => {
+    try {
+      const res = await fetch('/api/screenshot-payments/admin/list', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setScreenshotPayments(Array.isArray(data) ? data : []);
+      }
+    } catch (e) { console.error('refetchScreenshots:', e); }
+  };
+
+  const refetchNotifications = async (token) => {
+    try {
+      const res = await fetch('/api/users/admin/notifications', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(normalizeListPayload(data, ['notifications', 'items', 'data']));
+      }
+    } catch (e) { console.error('refetchNotifications:', e); }
   };
 
   const handleLogout = () => {
@@ -556,6 +725,15 @@ const AdminDashboard = () => {
   };
 
   // Product handlers
+  const buildProductPayload = () => ({
+    ...productForm,
+    category_id: productForm.category_id ? Number(productForm.category_id) : null,
+    quantity_in_stock: Number(productForm.quantity_in_stock) || 0,
+    buying_price: Number(productForm.buying_price) || 0,
+    selling_price: Number(productForm.selling_price) || 0,
+    prescription_required: Boolean(productForm.prescription_required),
+  });
+
   const handleSaveProduct = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -573,8 +751,10 @@ const AdminDashboard = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(productForm)
+        body: JSON.stringify(buildProductPayload())
       });
+
+      const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
         alert(editingProduct ? 'Product updated!' : 'Product created!');
@@ -588,10 +768,11 @@ const AdminDashboard = () => {
         });
         fetchData(token);
       } else {
-        alert('Failed to save product');
+        alert(data?.message || 'Failed to save product');
       }
     } catch (error) {
       console.error('Error saving product:', error);
+      alert('Failed to save product. Check that the server is running.');
     }
   };
 
@@ -646,10 +827,12 @@ const AdminDashboard = () => {
         setCategoryForm({ name: '', description: '' });
         fetchData(token);
       } else {
-        alert('Failed to save category');
+        const data = await res.json().catch(() => ({}));
+        alert(data?.message || 'Failed to save category');
       }
     } catch (error) {
       console.error('Error saving category:', error);
+      alert('Failed to save category. Check that the server is running.');
     }
   };
 
@@ -682,6 +865,7 @@ const AdminDashboard = () => {
     { id: 'categories', label: 'Categories', icon: Grid3X3 },
     { id: 'users', label: 'Users', icon: Users },
     { id: 'transactions', label: 'Transactions', icon: ShoppingCart },
+    { id: 'screenshot-payments', label: 'Screenshot Payments', icon: Camera },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'profile', label: 'Profile', icon: User },
   ];
@@ -735,10 +919,10 @@ const AdminDashboard = () => {
     setSelectedOrderIds((prev) => prev.filter((id) => visibleSet.has(id)));
   }, [allVisibleOrderIds]);
 
-  const paidStatuses = ['paid', 'shipped', 'completed'];
+  const paidStatuses = PAID_STATUSES;
   const totalRevenue = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
   const collectedRevenue = orders
-    .filter((order) => paidStatuses.includes(String(order.status || '').toLowerCase()))
+    .filter((order) => PAID_STATUSES.includes(String(order.status || '').toLowerCase()))
     .reduce((sum, order) => sum + Number(order.total || 0), 0);
   const activeCustomers = new Set(orders.map((order) => Number(order.user_id || 0)).filter(Boolean)).size;
   const statusCount = orders.reduce((acc, order) => {
@@ -769,31 +953,13 @@ const AdminDashboard = () => {
   ];
   const lowStockProductsCount = products.filter((item) => Number(item.quantity_in_stock || 0) <= 5).length;
   const unreadNotifications = notifications.filter((item) => !item.is_read).length;
-  const adminCount = adminUsers.filter((item) => Boolean(item.isAdmin)).length;
+  const adminCount = adminUsers.filter((item) => {
+    const raw = item.isAdmin ?? item.is_admin;
+    return raw === true || raw === 1 || raw === '1' || raw === 'true';
+  }).length;
   const pendingOrdersCount = orders.filter((item) => String(item.status || '').toLowerCase() === 'pending_payment').length;
   const uncollectedRevenue = Math.max(totalRevenue - collectedRevenue, 0);
   const newestNotification = notifications?.[0] || null;
-
-  const [animatedStats, setAnimatedStats] = useState({
-    totalRevenue: 0,
-    collectedRevenue: 0,
-    activeCustomers: 0,
-    orders: 0,
-    pendingOrders: 0,
-    uncollectedRevenue: 0,
-    lowStockProducts: 0,
-  });
-  const [statTrends, setStatTrends] = useState({
-    totalRevenue: 'neutral',
-    collectedRevenue: 'neutral',
-    activeCustomers: 'neutral',
-    orders: 'neutral',
-    pendingOrders: 'neutral',
-    uncollectedRevenue: 'neutral',
-    lowStockProducts: 'neutral',
-  });
-  const previousTargetsRef = useRef(null);
-  const trendResetRef = useRef(null);
 
   const statTargets = useMemo(
     () => ({
@@ -962,7 +1128,7 @@ const AdminDashboard = () => {
       const orderTotal = Number(order.total || 0);
       byDay[key].orders += 1;
       byDay[key].revenue += orderTotal;
-      if (paidStatuses.includes(String(order.status || '').toLowerCase())) {
+      if (PAID_STATUSES.includes(String(order.status || '').toLowerCase())) {
         byDay[key].collectedRevenue += orderTotal;
       }
     });
@@ -971,7 +1137,7 @@ const AdminDashboard = () => {
       ...item,
       shortLabel: item.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
     }));
-  }, [orders, activityRange, paidStatuses]);
+  }, [orders, activityRange]);
 
   const activitySummary = useMemo(() => {
     const maxRevenue = Math.max(1, ...activitySeries.map((item) => Number(item.revenue || 0)));
@@ -1022,16 +1188,22 @@ const AdminDashboard = () => {
 
   return (
     <div className="admin-dashboard">
+      {/* Mobile backdrop */}
+      <div
+        className={`admin-sidebar-backdrop ${sidebarOpen ? 'backdrop-open' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
       {/* Sidebar */}
-      <aside className="admin-sidebar">
+      <aside className={`admin-sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="admin-sidebar-header">
           <div className="admin-logo">
             <div className="admin-brand-mark">
               <LayoutDashboard size={18} />
             </div>
             <div className="admin-brand-copy">
-              <span>Eyeglass Admin</span>
-              <small>Operations Center</small>
+              <span>Z Visionary</span>
+              <small>ዜድ መነጸር · Admin</small>
             </div>
           </div>
         </div>
@@ -1043,12 +1215,15 @@ const AdminDashboard = () => {
               <button
                 key={tab.id}
                 className={`admin-nav-item ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => { setActiveTab(tab.id); setSidebarOpen(false); }}
               >
                 <Icon size={20} />
                 <span>{tab.label}</span>
                 {tab.id === 'notifications' && unreadNotificationsCount > 0 && (
                   <span className="admin-notification-pill">{unreadNotificationsCount}</span>
+                )}
+                {tab.id === 'screenshot-payments' && pendingScreenshotCount > 0 && (
+                  <span className="admin-notification-pill">{pendingScreenshotCount}</span>
                 )}
               </button>
             );
@@ -1082,6 +1257,21 @@ const AdminDashboard = () => {
 
       {/* Main Content */}
       <main className="admin-main">
+        {/* Mobile top bar — only visible on small screens via CSS */}
+        <div className="admin-mobile-topbar">
+          <button
+            type="button"
+            className="admin-mobile-menu-btn"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open navigation"
+          >
+            <Menu size={20} />
+          </button>
+          <span className="admin-mobile-topbar-title">
+            {tabs.find(t => t.id === activeTab)?.label || 'Dashboard'}
+          </span>
+          <div style={{ width: 44 }} />
+        </div>
         {/* Header */}
         <header className="admin-header">
           <div className="admin-header-left">
@@ -1495,7 +1685,7 @@ const AdminDashboard = () => {
                           <td>{product.name}</td>
                           <td>{product.brand || '-'}</td>
                           <td>{product.category_name || '-'}</td>
-                          <td>${product.selling_price}</td>
+                          <td>{etbFormatter.format(Number(product.selling_price) || 0)}</td>
                           <td>{product.quantity_in_stock}</td>
                           <td className="admin-actions">
                             <button 
@@ -1906,6 +2096,203 @@ const AdminDashboard = () => {
                         )}
                       </div>
                     ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {activeTab === 'screenshot-payments' && (
+              <motion.div
+                key="screenshot-payments"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="admin-section"
+              >
+                <div className="admin-section-header">
+                  <div>
+                    <h2>Screenshot Payments</h2>
+                    <p className="admin-section-subtitle">Review and verify bank transfer payment screenshots from customers.</p>
+                  </div>
+                </div>
+
+                <div className="admin-chip-row">
+                  <span className="admin-chip-pill">Total: {screenshotPayments.length}</span>
+                  <span className="admin-chip-pill admin-chip-pill-warn">Pending: {pendingScreenshotCount}</span>
+                  <span className="admin-chip-pill admin-chip-pill-success">
+                    Approved: {screenshotPayments.filter((s) => s.status === 'approved').length}
+                  </span>
+                  <span className="admin-chip-pill">
+                    Rejected: {screenshotPayments.filter((s) => s.status === 'rejected').length}
+                  </span>
+                </div>
+
+                <div className="admin-transaction-toolbar">
+                  <div className="admin-transaction-filters">
+                    <select
+                      value={screenshotStatusFilter}
+                      onChange={(e) => setScreenshotStatusFilter(e.target.value)}
+                    >
+                      <option value="all">All</option>
+                      <option value="pending">Pending</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                  </div>
+                </div>
+
+                {displayScreenshotPayments.length === 0 ? (
+                  <div className="admin-notifications-empty">
+                    No screenshot payments found.
+                  </div>
+                ) : (
+                  <div className="admin-screenshot-list">
+                    {displayScreenshotPayments.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`admin-screenshot-card ${item.status === 'pending' ? 'admin-screenshot-card-pending' : ''}`}
+                      >
+                        <div className="admin-screenshot-thumb-wrap">
+                          <img
+                            src={toServerUrl(item.screenshot_path)}
+                            alt="Payment screenshot"
+                            className="admin-screenshot-thumb"
+                            onClick={() => setPreviewScreenshot(toServerUrl(item.screenshot_path))}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') setPreviewScreenshot(item.screenshot_path);
+                            }}
+                            title="Click to enlarge"
+                          />
+                          <span className={`admin-screenshot-status admin-screenshot-status-${item.status}`}>
+                            {item.status}
+                          </span>
+                        </div>
+
+                        <div className="admin-screenshot-info">
+                          <div className="admin-screenshot-info-row">
+                            <div>
+                              <strong>Order #{item.order_id}</strong>
+                              <span className="admin-screenshot-customer">
+                                {item.customer_name || 'Unknown'} · {item.customer_email || '-'}
+                              </span>
+                            </div>
+                            <div className="admin-screenshot-amount">
+                              {(item.currency || 'ETB')} {Number(item.total || 0).toFixed(2)}
+                            </div>
+                          </div>
+
+                          {item.notes && (
+                            <p className="admin-screenshot-notes">
+                              <strong>Customer note:</strong> {item.notes}
+                            </p>
+                          )}
+
+                          {item.admin_note && (
+                            <p className="admin-screenshot-admin-note">
+                              <strong>Admin note:</strong> {item.admin_note}
+                            </p>
+                          )}
+
+                          <p className="admin-screenshot-date">
+                            Submitted: {new Date(item.created_at).toLocaleString()}
+                            {item.reviewed_at && ` · Reviewed: ${new Date(item.reviewed_at).toLocaleString()}`}
+                          </p>
+
+                          {item.status === 'pending' && (
+                            <div className="admin-screenshot-actions">
+                              {reviewingScreenshotId === item.id ? (
+                                <div className="admin-screenshot-review-form">
+                                  <textarea
+                                    placeholder="Admin note (optional)..."
+                                    value={adminNoteInput}
+                                    onChange={(e) => setAdminNoteInput(e.target.value)}
+                                    rows={2}
+                                    maxLength={500}
+                                    className="admin-screenshot-note-input"
+                                  />
+                                  <div className="admin-screenshot-review-btns">
+                                    <button
+                                      type="button"
+                                      className="admin-btn-success"
+                                      disabled={screenshotReviewLoading}
+                                      onClick={() => handleReviewScreenshotPayment(item.id, 'approve')}
+                                    >
+                                      {screenshotReviewLoading ? 'Processing...' : '✓ Approve'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="admin-btn-delete"
+                                      disabled={screenshotReviewLoading}
+                                      onClick={() => handleReviewScreenshotPayment(item.id, 'reject')}
+                                    >
+                                      {screenshotReviewLoading ? 'Processing...' : '✕ Reject'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="admin-btn-secondary"
+                                      onClick={() => {
+                                        setReviewingScreenshotId(null);
+                                        setAdminNoteInput('');
+                                      }}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="admin-btn-primary"
+                                  onClick={() => {
+                                    setReviewingScreenshotId(item.id);
+                                    setAdminNoteInput('');
+                                  }}
+                                >
+                                  Review Payment
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Image preview modal */}
+                {previewScreenshot && (
+                  <div
+                    className="admin-modal-overlay"
+                    onClick={() => setPreviewScreenshot(null)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Close preview"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') setPreviewScreenshot(null);
+                    }}
+                  >
+                    <motion.div
+                      className="admin-screenshot-preview-modal"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        className="admin-screenshot-preview-close"
+                        onClick={() => setPreviewScreenshot(null)}
+                        aria-label="Close"
+                      >
+                        <X size={20} />
+                      </button>
+                      <img
+                        src={previewScreenshot}
+                        alt="Full size payment screenshot"
+                        className="admin-screenshot-preview-img"
+                      />
+                    </motion.div>
                   </div>
                 )}
               </motion.div>

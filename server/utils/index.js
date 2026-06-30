@@ -24,6 +24,7 @@ const userRoutes = require('../routes/userRoutes');
 const categoryRoutes = require('../routes/categoryRoutes');
 const cartRoutes = require('../routes/cartRoutes');
 const paymentRoutes = require('../routes/paymentRoutes');
+const screenshotPaymentRoutes = require('../routes/screenshotPaymentRoutes');
 const aiRoutes = require('../routes/aiRoutes');
 const { chapaWebhookHandler } = require('../controllers/paymentController');
 
@@ -72,6 +73,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/screenshot-payments', screenshotPaymentRoutes);
 app.use('/api/ai', aiRoutes);
 
 app.use('/api', (req, res) => {
@@ -79,7 +81,7 @@ app.use('/api', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to Eyeglass Store API' });
+  res.json({ message: 'Welcome to Z Visionary (ዜድ መነጸር) API' });
 });
 
 app.use((err, req, res, next) => {

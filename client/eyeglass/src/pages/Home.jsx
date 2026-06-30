@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom'
+import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { 
   ArrowRight, 
@@ -19,6 +21,7 @@ import './Home.css'
 
 const Home = () => {
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -40,38 +43,38 @@ const Home = () => {
     }
   }
 
-  const features = [
-    { icon: Sparkles, title: 'Premium Quality', desc: 'High-quality frames and lenses for lasting durability', color: '#6366f1' },
-    { icon: Truck, title: 'Fast Delivery', desc: 'Get your eyeglasses delivered within 2-3 business days', color: '#ec4899' },
-    { icon: Shield, title: 'Secure Payment', desc: '100% secure checkout with multiple payment options', color: '#10b981' },
-    { icon: Headphones, title: 'Expert Support', desc: 'Our opticians are here to help you choose the perfect pair', color: '#f59e0b' }
-  ]
+  const features = useMemo(() => [
+    { icon: Sparkles, title: t('home.features.quality.title'), desc: t('home.features.quality.desc'), color: '#6366f1' },
+    { icon: Truck, title: t('home.features.delivery.title'), desc: t('home.features.delivery.desc'), color: '#ec4899' },
+    { icon: Shield, title: t('home.features.payment.title'), desc: t('home.features.payment.desc'), color: '#10b981' },
+    { icon: Headphones, title: t('home.features.support.title'), desc: t('home.features.support.desc'), color: '#f59e0b' }
+  ], [t])
 
-  const categories = [
-    { id: 1, name: 'Men\'s Glasses', image: 'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=400&h=500&auto=format&fit=crop', count: '45 Products', color: '#3b82f6' },
-    { id: 2, name: 'Women\'s Glasses', image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=400&h=500&auto=format&fit=crop', count: '52 Products', color: '#ec4899' },
-    { id: 3, name: 'Kids Glasses', image: 'https://images.unsplash.com/photo-1591076482161-42ce6da69f67?w=400&h=500&auto=format&fit=crop', count: '28 Products', color: '#f59e0b' },
-    { id: 4, name: 'Sunglasses', image: 'https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=400&h=500&auto=format&auto=format&fit=crop', count: '36 Products', color: '#10b981' }
-  ]
+  const categories = useMemo(() => [
+    { id: 1, name: t('home.categories.mens'), image: 'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=400&h=500&auto=format&fit=crop', count: '45 ' + t('common.products'), color: '#3b82f6' },
+    { id: 2, name: t('home.categories.womens'), image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=400&h=500&auto=format&fit=crop', count: '52 ' + t('common.products'), color: '#ec4899' },
+    { id: 3, name: t('home.categories.kids'), image: 'https://images.unsplash.com/photo-1591076482161-42ce6da69f67?w=400&h=500&auto=format&fit=crop', count: '28 ' + t('common.products'), color: '#f59e0b' },
+    { id: 4, name: t('home.categories.sunglasses'), image: 'https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=400&h=500&auto=format&auto=format&fit=crop', count: '36 ' + t('common.products'), color: '#10b981' }
+  ], [t])
 
   const featuredProducts = [
-    { id: 1, name: 'Classic Round Frame', price: 129, originalPrice: 169, rating: 4.8, reviews: 124, image: 'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=400&h=400&auto=format&fit=crop', badge: 'Bestseller' },
-    { id: 2, name: 'Modern Rectangular', price: 149, originalPrice: 199, rating: 4.9, reviews: 89, image: 'https://images.unsplash.com/photo-1483412468200-72182dbbc544?q=80&w=1173&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', badge: 'New' },
-    { id: 3, name: 'Vintage Cat Eye', price: 159, originalPrice: 209, rating: 4.7, reviews: 67, image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=400&h=400&auto=format&fit=crop', badge: null },
-    { id: 4, name: 'Titanium Ultra-Light', price: 199, originalPrice: 259, rating: 4.9, reviews: 156, image: 'https://images.unsplash.com/photo-1591076482161-42ce6da69f67?w=400&h=400&auto=format&auto=format&fit=crop', badge: 'Premium' }
+    { id: 1, name: 'Classic Round Frame', price: 129, originalPrice: 169, rating: 4.8, reviews: 124, image: 'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=400&h=400&auto=format&fit=crop', badgeKey: 'bestseller' },
+    { id: 2, name: 'Modern Rectangular', price: 149, originalPrice: 199, rating: 4.9, reviews: 89, image: 'https://images.unsplash.com/photo-1483412468200-72182dbbc544?q=80&w=1173&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', badgeKey: 'new' },
+    { id: 3, name: 'Vintage Cat Eye', price: 159, originalPrice: 209, rating: 4.7, reviews: 67, image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=400&h=400&auto=format&fit=crop', badgeKey: null },
+    { id: 4, name: 'Titanium Ultra-Light', price: 199, originalPrice: 259, rating: 4.9, reviews: 156, image: 'https://images.unsplash.com/photo-1591076482161-42ce6da69f67?w=400&h=400&auto=format&auto=format&fit=crop', badgeKey: 'premium' }
   ]
+
+  const stats = useMemo(() => [
+    { value: '50K+', label: t('home.stats.customers') },
+    { value: '10K+', label: t('home.stats.products') },
+    { value: '4.9', label: t('home.stats.rating') },
+    { value: '24/7', label: t('home.stats.support') }
+  ], [t])
 
   const testimonials = [
     { id: 1, name: 'Sarah Johnson', role: 'Fashion Designer', avatar: 'SJ', content: 'The quality of these glasses is exceptional. I\'ve received so many compliments!', rating: 5 },
     { id: 2, name: 'Michael Chen', role: 'Software Engineer', avatar: 'MC', content: 'Best online glasses shopping experience. Fast shipping and perfect fit.', rating: 5 },
     { id: 3, name: 'Emma Williams', role: 'Marketing Manager', avatar: 'EW', content: 'Affordable prices without compromising on style. Highly recommend!', rating: 5 }
-  ]
-
-  const stats = [
-    { value: '50K+', label: 'Happy Customers' },
-    { value: '10K+', label: 'Products' },
-    { value: '4.9', label: 'Rating' },
-    { value: '24/7', label: 'Support' }
   ]
 
   return (
@@ -101,16 +104,17 @@ const Home = () => {
           >
             <motion.div variants={itemVariants} className="hero-badge">
               <Sparkles size={16} />
-              <span>New Collection 2024</span>
+              <span>{t('home.newCollection')}</span>
             </motion.div>
             
             <motion.h1 variants={itemVariants} className="hero-title">
-              See the World
-              <span className="gradient-text"> Clearly</span>
+              {t('home.heroTitle')}
+              <span className="gradient-text">{t('home.heroTitleHighlight')}</span>
+              {t('home.heroTitleEnd')}
             </motion.h1>
             
             <motion.p variants={itemVariants} className="hero-desc">
-              Premium eyeglasses crafted for style and comfort. Find your perfect pair today and experience vision like never before.
+              {t('home.heroDesc')}
             </motion.p>
             
             <motion.div variants={itemVariants} className="hero-buttons">
@@ -120,7 +124,7 @@ const Home = () => {
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.95 }}
               >
-                Shop Now
+                {t('common.shopNow')}
                 <ArrowRight size={20} />
               </motion.button>
               
@@ -130,7 +134,7 @@ const Home = () => {
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.95 }}
               >
-                Explore Collection
+                {t('common.exploreCollection')}
               </motion.button>
             </motion.div>
 
@@ -168,8 +172,8 @@ const Home = () => {
             transition={{ duration: 0.6 }}
             className="section-header"
           >
-            <span className="section-subtitle">Why Choose Us</span>
-            <h2 className="section-title">Experience the Difference</h2>
+            <span className="section-subtitle">{t('home.whyUs')}</span>
+            <h2 className="section-title">{t('home.experienceDiff')}</h2>
           </motion.div>
 
           <motion.div
@@ -214,15 +218,15 @@ const Home = () => {
             transition={{ duration: 0.6 }}
             className="cta-content"
           >
-            <h2>Ready to Transform Your Look?</h2>
-            <p>Join thousands of satisfied customers and find your perfect pair today.</p>
+            <h2>{t('home.ctaTitle')}</h2>
+            <p>{t('home.ctaDesc')}</p>
             <motion.button 
               className="btn btn-white"
               onClick={() => navigate('/shop')}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              Start Shopping
+              {t('home.startShopping')}
               <ArrowRight size={20} />
             </motion.button>
           </motion.div>
@@ -239,8 +243,8 @@ const Home = () => {
             transition={{ duration: 0.6 }}
             className="section-header"
           >
-            <span className="section-subtitle">Browse By Category</span>
-            <h2 className="section-title">Find Your Perfect Style</h2>
+            <span className="section-subtitle">{t('home.browseCategory')}</span>
+            <h2 className="section-title">{t('home.findStyle')}</h2>
           </motion.div>
 
           <motion.div
@@ -265,7 +269,7 @@ const Home = () => {
                       <h3>{category.name}</h3>
                       <p>{category.count}</p>
                       <span className="category-link">
-                        Shop Now <ChevronRight size={16} />
+                        {t('common.shopNow')} <ChevronRight size={16} />
                       </span>
                     </div>
                   </div>
@@ -286,8 +290,8 @@ const Home = () => {
             transition={{ duration: 0.6 }}
             className="section-header"
           >
-            <span className="section-subtitle">Featured Collection</span>
-            <h2 className="section-title">Most Popular Picks</h2>
+            <span className="section-subtitle">{t('home.featuredCollection')}</span>
+            <h2 className="section-title">{t('home.popularPicks')}</h2>
           </motion.div>
 
           <motion.div
@@ -304,12 +308,12 @@ const Home = () => {
                 variants={itemVariants}
                 whileHover={{ y: -8 }}
               >
-                {product.badge && (
+                {product.badgeKey && (
                   <span className="product-badge" style={{ 
-                    background: product.badge === 'Bestseller' ? '#f59e0b' : 
-                               product.badge === 'New' ? '#10b981' : '#6366f1' 
+                    background: product.badgeKey === 'bestseller' ? '#f59e0b' : 
+                               product.badgeKey === 'new' ? '#10b981' : '#6366f1' 
                   }}>
-                    {product.badge}
+                    {t(`home.badges.${product.badgeKey}`)}
                   </span>
                 )}
                 <button className="wishlist-btn">
@@ -335,7 +339,7 @@ const Home = () => {
                     whileTap={{ scale: 0.98 }}
                   >
                     <ShoppingBag size={16} />
-                    Add to Cart
+                    {t('home.addToCart')}
                   </motion.button>
                 </div>
               </motion.div>
@@ -354,7 +358,7 @@ const Home = () => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              View All Products
+              {t('common.viewAll')}
               <ArrowRight size={18} />
             </motion.button>
           </motion.div>
@@ -373,16 +377,16 @@ const Home = () => {
               transition={{ duration: 0.6 }}
             >
               <div className="promo-content">
-                <span className="promo-label">Summer Sale</span>
-                <h3>Up to 50% Off</h3>
-                <p>On selected premium frames</p>
+                <span className="promo-label">{t('home.summerSale')}</span>
+                <h3>{t('home.upTo50Off')}</h3>
+                <p>{t('home.onSelectedFrames')}</p>
                 <motion.button 
                   className="btn btn-promo"
                   onClick={() => navigate('/shop')}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  Shop Sale
+                  {t('home.shopSale')}
                   <Zap size={16} />
                 </motion.button>
               </div>
@@ -399,15 +403,15 @@ const Home = () => {
               transition={{ duration: 0.6, delay: 0.2 }}
             >
               <div className="promo-content">
-                <span className="promo-label">New Arrivals</span>
-                <h3>2024 Collection</h3>
+                <span className="promo-label">{t('home.newArrivals')}</span>
+                <h3>{t('home.collection2024')}</h3>
                 <motion.button 
                   className="btn btn-promo-outline"
                   onClick={() => navigate('/shop')}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  Explore
+                  {t('home.explore')}
                   <ArrowRight size={16} />
                 </motion.button>
               </div>
@@ -426,8 +430,8 @@ const Home = () => {
             transition={{ duration: 0.6 }}
             className="section-header"
           >
-            <span className="section-subtitle">Testimonials</span>
-            <h2 className="section-title">What Our Customers Say</h2>
+            <span className="section-subtitle">{t('home.testimonials')}</span>
+            <h2 className="section-title">{t('home.whatCustomersSay')}</h2>
           </motion.div>
 
           <motion.div
@@ -478,16 +482,16 @@ const Home = () => {
               <div className="newsletter-icon">
                 <Mail size={32} />
               </div>
-              <h2>Subscribe to Our Newsletter</h2>
-              <p>Get exclusive offers, new arrivals, and style tips delivered to your inbox.</p>
+              <h2>{t('home.newsletterTitle')}</h2>
+              <p>{t('home.newsletterDesc')}</p>
               <div className="newsletter-form">
-                <input type="email" placeholder="Enter your email" />
+                <input type="email" placeholder={t('common.emailPlaceholder')} />
                 <motion.button 
                   className="btn btn-primary"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  Subscribe
+                  {t('common.subscribe')}
                 </motion.button>
               </div>
             </div>

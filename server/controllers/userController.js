@@ -322,6 +322,99 @@ const markAdminNotificationRead = async (req, res) => {
   }
 };
 
+// @desc    Get user's own notifications
+// @route   GET /api/users/notifications
+// @access  Private
+const getUserNotifications = async (req, res) => {
+  try {
+    const connection = getConnection();
+    const query = `
+      SELECT id, type, title, message, metadata, is_read, created_at
+      FROM user_notifications
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT 50
+    `;
+
+    connection.query(query, [req.user.id], (err, results) => {
+      if (err) {
+        console.error('Error fetching user notifications:', err);
+        return res.status(500).json({ message: 'Error fetching notifications' });
+      }
+
+      const notifications = (results || []).map((item) => {
+        let parsedMetadata = null;
+        try {
+          parsedMetadata = item.metadata ? JSON.parse(item.metadata) : null;
+        } catch {
+          parsedMetadata = item.metadata || null;
+        }
+        return { ...item, is_read: Boolean(item.is_read), metadata: parsedMetadata };
+      });
+
+      res.json(notifications);
+    });
+  } catch (error) {
+    console.error('Error in getUserNotifications:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Mark a user notification as read
+// @route   PUT /api/users/notifications/:id/read
+// @access  Private
+const markUserNotificationRead = async (req, res) => {
+  try {
+    const connection = getConnection();
+    const notificationId = Number(req.params.id);
+
+    if (!notificationId) {
+      return res.status(400).json({ message: 'Invalid notification id' });
+    }
+
+    // Only update if it belongs to this user
+    const query = 'UPDATE user_notifications SET is_read = 1 WHERE id = ? AND user_id = ?';
+    connection.query(query, [notificationId, req.user.id], (err, result) => {
+      if (err) {
+        console.error('Error updating user notification:', err);
+        return res.status(500).json({ message: 'Error updating notification' });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Notification not found' });
+      }
+
+      res.json({ message: 'Notification marked as read' });
+    });
+  } catch (error) {
+    console.error('Error in markUserNotificationRead:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Mark all user notifications as read
+// @route   PUT /api/users/notifications/read-all
+// @access  Private
+const markAllUserNotificationsRead = async (req, res) => {
+  try {
+    const connection = getConnection();
+    connection.query(
+      'UPDATE user_notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0',
+      [req.user.id],
+      (err) => {
+        if (err) {
+          console.error('Error marking all notifications read:', err);
+          return res.status(500).json({ message: 'Server error' });
+        }
+        res.json({ message: 'All notifications marked as read' });
+      }
+    );
+  } catch (error) {
+    console.error('Error in markAllUserNotificationsRead:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -330,4 +423,7 @@ module.exports = {
   getAdminUsers,
   getAdminNotifications,
   markAdminNotificationRead,
+  getUserNotifications,
+  markUserNotificationRead,
+  markAllUserNotificationsRead,
 };

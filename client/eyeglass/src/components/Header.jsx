@@ -1,96 +1,108 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, User, Menu, X, Glasses, Search, Heart, LogOut, LayoutDashboard } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import {
+  ShoppingCart, User, Menu, X, Glasses,
+  LogOut, Bell, CheckCircle2, AlertTriangle, Clock, ChevronRight,
+} from 'lucide-react';
 import { useDispatch } from 'react-redux';
 import { cartApi, useGetCartQuery } from '../redux/api/cart';
+import {
+  useGetUserNotificationsQuery,
+  useMarkUserNotificationReadMutation,
+  useMarkAllUserNotificationsReadMutation,
+} from '../redux/api/auth';
+import LanguageSwitcher from './LanguageSwitcher';
 import './Header.css';
 
 const Header = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [cartCount, setCartCount] = useState(0);
-  const [user, setUser] = useState(null);
+  const { t }                             = useTranslation();
+  const [isScrolled, setIsScrolled]       = useState(false);
+  const [isMobileMenuOpen, setMobileMenu] = useState(false);
+  const [cartCount, setCartCount]         = useState(0);
+  const [user, setUser]                   = useState(null);
+  const [notifOpen, setNotifOpen]         = useState(false);
+
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const token = localStorage.getItem('token');
+  const token    = localStorage.getItem('token');
+
+  /* ── Cart data ── */
   const { data: serverCart = [], refetch: refetchCart } = useGetCartQuery(undefined, {
     skip: !token,
     refetchOnMountOrArgChange: true,
   });
 
+  /* ── Notifications ── */
+  const { data: userNotifications = [] } = useGetUserNotificationsQuery(undefined, {
+    skip: !token,
+    pollingInterval: 30000,
+  });
+  const [markRead]    = useMarkUserNotificationReadMutation();
+  const [markAllRead] = useMarkAllUserNotificationsReadMutation();
+  const unreadCount   = userNotifications.filter((n) => !n.is_read).length;
+
+  const NOTIF_ICONS = { payment_approved: CheckCircle2, payment_rejected: AlertTriangle };
+  const handleMarkRead    = async (id) => { try { await markRead(id).unwrap();    } catch {} };
+  const handleMarkAllRead = async ()   => { try { await markAllRead().unwrap();   } catch {} };
+
+  /* ── Scroll listener ── */
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    const onScroll = () => setIsScrolled(window.scrollY > 50);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  useEffect(() => {
-    setIsMobileMenuOpen(false);
-  }, [location]);
+  /* ── Close overlays on route change ── */
+  useEffect(() => { setMobileMenu(false); setNotifOpen(false); }, [location]);
 
-  // Check if user is logged in
+  /* ── Lock body scroll when mobile menu is open ── */
   useEffect(() => {
-    const checkUser = () => {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        try {
-          setUser(JSON.parse(storedUser));
-        } catch {
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
+    document.body.style.overflow = isMobileMenuOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isMobileMenuOpen]);
+
+  /* ── User from localStorage ── */
+  useEffect(() => {
+    const sync = () => {
+      const stored = localStorage.getItem('user');
+      try { setUser(stored ? JSON.parse(stored) : null); } catch { setUser(null); }
     };
-    checkUser();
-    // Listen for storage changes (other tabs) and auth-change (same tab)
-    window.addEventListener('storage', checkUser);
-    window.addEventListener('auth-change', checkUser);
+    sync();
+    window.addEventListener('storage', sync);
+    window.addEventListener('auth-change', sync);
     return () => {
-      window.removeEventListener('storage', checkUser);
-      window.removeEventListener('auth-change', checkUser);
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('auth-change', sync);
     };
   }, [location]);
 
+  /* ── Cart count ── */
   useEffect(() => {
     if (token) {
-      const count = serverCart.reduce((total, item) => total + Number(item.quantity || 0), 0);
-      setCartCount(count);
+      setCartCount(serverCart.reduce((s, i) => s + Number(i.quantity || 0), 0));
       return;
     }
-
-    const updateGuestCartCount = () => {
-      const savedCart = localStorage.getItem('cart');
-      const parsedCart = savedCart ? JSON.parse(savedCart) : [];
-      const count = parsedCart.reduce((total, item) => total + Number(item.quantity || 0), 0);
-      setCartCount(count);
+    const sync = () => {
+      const items = (() => { try { return JSON.parse(localStorage.getItem('cart') || '[]'); } catch { return []; } })();
+      setCartCount(items.reduce((s, i) => s + Number(i.quantity || 0), 0));
     };
-
-    updateGuestCartCount();
-    window.addEventListener('storage', updateGuestCartCount);
-    window.addEventListener('cart-change', updateGuestCartCount);
-    return () => {
-      window.removeEventListener('storage', updateGuestCartCount);
-      window.removeEventListener('cart-change', updateGuestCartCount);
-    };
+    sync();
+    window.addEventListener('storage', sync);
+    window.addEventListener('cart-change', sync);
+    return () => { window.removeEventListener('storage', sync); window.removeEventListener('cart-change', sync); };
   }, [token, serverCart]);
 
   useEffect(() => {
     if (!token) return;
-    const handleCartRefresh = () => {
-      dispatch(cartApi.util.invalidateTags(['Cart']));
-      refetchCart();
-    };
-    window.addEventListener('cart-change', handleCartRefresh);
-    return () => {
-      window.removeEventListener('cart-change', handleCartRefresh);
-    };
+    const refresh = () => { dispatch(cartApi.util.invalidateTags(['Cart'])); refetchCart(); };
+    window.addEventListener('cart-change', refresh);
+    return () => window.removeEventListener('cart-change', refresh);
   }, [token, refetchCart, dispatch]);
 
+  /* ── Logout ── */
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -100,199 +112,348 @@ const Header = () => {
     navigate('/login');
   };
 
-  const navLinks = [
-    { path: '/', label: 'Home' },
-    { path: '/shop', label: 'Shop' },
-    { path: '/cart', label: 'Cart' },
-  ];
-
-  const isAdminUser = (user) => {
-    if (!user || typeof user !== 'object') return false;
-    const raw = user.isAdmin ?? user.is_admin;
+  const isAdminUser = (u) => {
+    if (!u) return false;
+    const raw = u.isAdmin ?? u.is_admin;
     return raw === true || raw === 1 || raw === '1' || raw === 'true';
   };
 
-  // Add admin link if user is admin
-  if (isAdminUser(user)) {
-    navLinks.push({ path: '/admin', label: 'Admin', icon: LayoutDashboard });
-  }
+  const navLinks = useMemo(() => {
+    const links = [
+      { path: '/',     label: t('nav.home') },
+      { path: '/shop', label: t('nav.shop') },
+      { path: '/cart', label: t('nav.cart') },
+    ];
+    if (isAdminUser(user)) links.push({ path: '/admin', label: t('nav.admin') });
+    return links;
+  }, [t, user]);
 
-  const isActive = (path) => location.pathname === path;
-  const cartCountLabel = cartCount > 99 ? '99+' : cartCount;
-  const avatarInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
+  const isActive     = (p) => location.pathname === p;
+  const cartLabel    = cartCount > 99 ? '99+' : cartCount;
+  const avatarLetter = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
 
   return (
     <>
+      {/* ════════════════ HEADER BAR ════════════════ */}
       <motion.header
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        initial={{ y: -70, opacity: 0 }}
+        animate={{ y: 0,   opacity: 1 }}
+        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className={`header ${isScrolled ? 'header-scrolled' : ''}`}
       >
         <div className="header-container">
+
           {/* Logo */}
-          <motion.div 
+          <motion.div
             className="logo"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => navigate('/')}
+            role="link"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
+            aria-label="Go to home"
           >
             <div className="logo-icon">
-              <Glasses size={28} strokeWidth={2} />
+              <Glasses size={22} strokeWidth={2.3} />
             </div>
-            <span className="logo-text">Visionary</span>
+            <span className="logo-text">{t('brand.name')}</span>
           </motion.div>
 
-          {/* Desktop Navigation */}
-          <nav className="desktop-nav">
-            {navLinks.map((link, index) => (
-              <motion.div
+          {/* ── Desktop nav: modern segmented pill ── */}
+          <nav className="desktop-nav" aria-label="Main navigation">
+            {navLinks.map((link) => (
+              <Link
                 key={link.path}
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 + 0.3 }}
+                to={link.path}
+                className={`nav-link ${isActive(link.path) ? 'nav-link-active' : ''}`}
               >
-                <Link
-                  to={link.path}
-                  className={`nav-link ${isActive(link.path) ? 'nav-link-active' : ''}`}
-                >
-                  <span>{link.label}</span>
-                  {isActive(link.path) && (
-                    <motion.div
-                      className="nav-link-underline"
-                      layoutId="activeNav"
-                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                    />
-                  )}
-                </Link>
-              </motion.div>
+                {isActive(link.path) && (
+                  <motion.span
+                    layoutId="nav-pill"
+                    className="nav-pill-bg"
+                    transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                  />
+                )}
+                <span className="nav-link-label">{link.label}</span>
+              </Link>
             ))}
           </nav>
 
-          {/* Actions */}
+          {/* ── Right actions ── */}
           <div className="header-actions">
-            <motion.button
-              className="action-btn"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <Search size={20} />
-            </motion.button>
-            
-            <motion.button
-              className="action-btn"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <Heart size={20} />
-            </motion.button>
 
-            <motion.div
-              className="cart-btn"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+            {/* Language — always visible, compact on mobile */}
+            <span className="action-lang">
+              <LanguageSwitcher compact />
+            </span>
+
+            {/* Cart */}
+            <motion.button
+              className="action-btn cart-btn"
+              whileHover={{ scale: 1.07 }}
+              whileTap={{ scale: 0.93 }}
               onClick={() => navigate('/cart')}
+              aria-label={`Cart${cartCount > 0 ? `, ${cartCount} items` : ''}`}
             >
-              <ShoppingCart size={20} />
-              {cartCount > 0 && (
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="cart-badge"
-                >
-                  {cartCountLabel}
-                </motion.span>
-              )}
-            </motion.div>
+              <ShoppingCart size={18} />
+              <AnimatePresence>
+                {cartCount > 0 && (
+                  <motion.span
+                    key="badge"
+                    className="cart-badge"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                  >
+                    {cartLabel}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.button>
 
-            {/* User Section */}
+            {/* Notification bell */}
+            {user && (
+              <div className="notif-wrap">
+                <motion.button
+                  className="action-btn notif-btn"
+                  whileHover={{ scale: 1.07 }}
+                  whileTap={{ scale: 0.93 }}
+                  onClick={() => setNotifOpen((v) => !v)}
+                  aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
+                >
+                  <Bell size={18} />
+                  <AnimatePresence>
+                    {unreadCount > 0 && (
+                      <motion.span
+                        key="nb"
+                        className="notif-badge"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        exit={{ scale: 0 }}
+                      >
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </motion.button>
+
+                <AnimatePresence>
+                  {notifOpen && (
+                    <>
+                      <div className="notif-backdrop" onClick={() => setNotifOpen(false)} />
+                      <motion.div
+                        className="notif-dropdown"
+                        initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0,  scale: 1   }}
+                        exit={  { opacity: 0, y: -8, scale: 0.96 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <div className="notif-header">
+                          <span className="notif-title">Notifications</span>
+                          {unreadCount > 0 && (
+                            <button className="notif-mark-all" type="button" onClick={handleMarkAllRead}>
+                              Mark all read
+                            </button>
+                          )}
+                        </div>
+
+                        {userNotifications.length === 0 ? (
+                          <div className="notif-empty">
+                            <Bell size={22} />
+                            <p>No notifications yet</p>
+                          </div>
+                        ) : (
+                          <div className="notif-list">
+                            {userNotifications.map((notif) => {
+                              const Icon = NOTIF_ICONS[notif.type] || Clock;
+                              const tone = notif.type === 'payment_approved' ? 'success'
+                                : notif.type === 'payment_rejected' ? 'error' : 'info';
+                              return (
+                                <div
+                                  key={notif.id}
+                                  className={`notif-item ${notif.is_read ? 'notif-read' : 'notif-unread'} notif-type-${tone}`}
+                                  onClick={() => { if (!notif.is_read) handleMarkRead(notif.id); }}
+                                  role="button"
+                                  tabIndex={0}
+                                  onKeyDown={(e) => { if (e.key === 'Enter' && !notif.is_read) handleMarkRead(notif.id); }}
+                                >
+                                  <div className="notif-item-icon"><Icon size={14} /></div>
+                                  <div className="notif-item-body">
+                                    <p className="notif-item-title">{notif.title}</p>
+                                    <p className="notif-item-msg">{notif.message}</p>
+                                    <span className="notif-item-time">{new Date(notif.created_at).toLocaleString()}</span>
+                                  </div>
+                                  {!notif.is_read && <span className="notif-dot" />}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+
+            {/* User avatar — desktop only */}
             {user ? (
-              <div className="user-section">
+              <div className="user-section hide-on-mobile">
                 <button
                   type="button"
                   className="profile-chip"
                   onClick={() => navigate('/profile')}
-                  title="Open profile"
+                  title="My Profile"
                 >
-                  {user.profile_image ? (
-                    <img src={user.profile_image} alt={user.name} className="header-avatar" />
-                  ) : (
-                    <span className="header-avatar header-avatar-fallback">{avatarInitial}</span>
-                  )}
+                  {user.profile_image
+                    ? <img src={user.profile_image} alt={user.name} className="header-avatar" />
+                    : <span className="header-avatar header-avatar-fallback">{avatarLetter}</span>
+                  }
                   <span className="user-name">{user.name}</span>
                 </button>
                 <motion.button
                   className="action-btn logout-btn"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
+                  whileHover={{ scale: 1.07 }}
+                  whileTap={{ scale: 0.93 }}
                   onClick={handleLogout}
-                  title="Logout"
+                  title={t('nav.logout')}
                 >
-                  <LogOut size={20} />
+                  <LogOut size={17} />
                 </motion.button>
               </div>
             ) : (
               <motion.button
-                className="action-btn user-btn"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
+                className="action-btn user-btn hide-on-mobile"
+                whileHover={{ scale: 1.07 }}
+                whileTap={{ scale: 0.93 }}
                 onClick={() => navigate('/login')}
+                aria-label="Login"
               >
-                <User size={20} />
+                <User size={18} />
               </motion.button>
             )}
 
-            {/* Mobile Menu Toggle */}
+            {/* ── Hamburger: ALWAYS last, never clipped ── */}
             <motion.button
               className="mobile-menu-btn"
-              whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              onClick={() => setMobileMenu((v) => !v)}
+              aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={isMobileMenuOpen}
             >
-              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              <AnimatePresence mode="wait" initial={false}>
+                {isMobileMenuOpen
+                  ? <motion.span key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.16 }}><X size={20} /></motion.span>
+                  : <motion.span key="m" initial={{ rotate: 90,  opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.16 }}><Menu size={20} /></motion.span>
+                }
+              </AnimatePresence>
             </motion.button>
           </div>
         </div>
       </motion.header>
 
-      {/* Mobile Menu */}
+      {/* ════════════════ MOBILE DRAWER ════════════════ */}
       <AnimatePresence>
         {isMobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, x: '100%' }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="mobile-menu"
-          >
-            <nav className="mobile-nav">
-              {navLinks.map((link, index) => (
-                <motion.div
-                  key={link.path}
-                  initial={{ opacity: 0, x: 50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
+          <>
+            {/* Dim backdrop */}
+            <motion.div
+              key="backdrop"
+              className="mobile-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22 }}
+              onClick={() => setMobileMenu(false)}
+            />
+
+            {/* Slide-in drawer */}
+            <motion.div
+              key="drawer"
+              className="mobile-menu"
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 280 }}
+            >
+              {/* Drawer header */}
+              <div className="mobile-menu-header">
+                <div className="mobile-logo">
+                  <div className="logo-icon">
+                    <Glasses size={18} strokeWidth={2.3} />
+                  </div>
+                  <span>{t('brand.name')}</span>
+                </div>
+                <button
+                  className="mobile-close-btn"
+                  onClick={() => setMobileMenu(false)}
+                  aria-label="Close menu"
                 >
-                  <Link
-                    to={link.path}
-                    className={`mobile-nav-link ${isActive(link.path) ? 'mobile-nav-link-active' : ''}`}
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Nav links */}
+              <nav className="mobile-nav" aria-label="Mobile navigation">
+                {navLinks.map((link, i) => (
+                  <motion.div
+                    key={link.path}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.055, duration: 0.22 }}
                   >
-                    {link.label}
-                  </Link>
-                </motion.div>
-              ))}
-              {user ? (
-                <>
-                  <div className="mobile-user-name">Hello, {user.name}</div>
-                  <button className="mobile-logout-btn" onClick={handleLogout}>
-                    <LogOut size={18} /> Logout
+                    <Link
+                      to={link.path}
+                      className={`mobile-nav-link ${isActive(link.path) ? 'mobile-nav-link-active' : ''}`}
+                      onClick={() => setMobileMenu(false)}
+                    >
+                      <span>{link.label}</span>
+                      <ChevronRight size={15} className="mobile-nav-chevron" />
+                    </Link>
+                  </motion.div>
+                ))}
+              </nav>
+
+              {/* Footer */}
+              <div className="mobile-menu-footer">
+                <div className="mobile-lang-row">
+                  <LanguageSwitcher />
+                </div>
+
+                {user ? (
+                  <div className="mobile-user-block">
+                    <div className="mobile-user-info">
+                      {user.profile_image
+                        ? <img src={user.profile_image} alt={user.name} className="mobile-avatar" />
+                        : <span className="mobile-avatar mobile-avatar-fallback">{avatarLetter}</span>
+                      }
+                      <div style={{ minWidth: 0 }}>
+                        <p className="mobile-user-name">{user.name}</p>
+                        <p className="mobile-user-email">{user.email}</p>
+                      </div>
+                    </div>
+                    <button
+                      className="mobile-profile-btn"
+                      onClick={() => { navigate('/profile'); setMobileMenu(false); }}
+                    >
+                      View Profile
+                    </button>
+                    <button className="mobile-logout-btn" onClick={handleLogout}>
+                      <LogOut size={15} /> {t('nav.logout')}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="mobile-login-btn"
+                    onClick={() => { navigate('/login'); setMobileMenu(false); }}
+                  >
+                    <User size={15} /> {t('nav.login')}
                   </button>
-                </>
-              ) : (
-                <Link to="/login" className="mobile-nav-link">Login</Link>
-              )}
-            </nav>
-          </motion.div>
+                )}
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </>

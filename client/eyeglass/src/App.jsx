@@ -4,6 +4,7 @@ import Home from './pages/Home'
 import Shop from './pages/Shop'
 import Cart from './pages/Cart'
 import PaymentResult from './pages/PaymentResult'
+import ScreenshotPayment from './pages/ScreenshotPayment'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import AdminDashboard from './pages/AdminDashboard'
@@ -35,6 +36,14 @@ function App() {
         <Route path="/shop" element={<Layout><Shop /></Layout>} />
         <Route path="/cart" element={<Layout><Cart /></Layout>} />
         <Route path="/payment-result" element={<Layout><PaymentResult /></Layout>} />
+        <Route
+          path="/screenshot-payment"
+          element={
+            <ProtectedRoute>
+              <Layout><ScreenshotPayment /></Layout>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/profile"
           element={

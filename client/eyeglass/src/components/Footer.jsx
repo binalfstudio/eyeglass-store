@@ -1,9 +1,14 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Glasses, Mail, Phone, MapPin, Facebook, Twitter, Instagram, Youtube, CreditCard, Truck, Shield, RotateCcw } from 'lucide-react';
 import './Footer.css';
 
 const Footer = () => {
+  const { t } = useTranslation();
+  const year = new Date().getFullYear();
+  const freeShippingAmount = 'ETB 50.00';
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -24,19 +29,20 @@ const Footer = () => {
     }
   };
 
+  const features = [
+    { icon: Truck, title: t('footer.freeShipping'), desc: t('footer.freeShippingDesc', { amount: freeShippingAmount }) },
+    { icon: Shield, title: t('footer.securePayment'), desc: t('footer.securePaymentDesc') },
+    { icon: RotateCcw, title: t('footer.easyReturns'), desc: t('footer.easyReturnsDesc') },
+    { icon: CreditCard, title: t('footer.bestPrices'), desc: t('footer.bestPricesDesc') }
+  ];
+
   return (
     <footer className="footer">
-      {/* Features Bar */}
       <div className="features-bar">
         <div className="features-bar-container">
-          {[
-            { icon: Truck, title: 'Free Shipping', desc: 'On orders over ETB 50.00' },
-            { icon: Shield, title: 'Secure Payment', desc: '100% secure checkout' },
-            { icon: RotateCcw, title: 'Easy Returns', desc: '30-day return policy' },
-            { icon: CreditCard, title: 'Best Prices', desc: 'Guaranteed low prices' }
-          ].map((feature, index) => (
+          {features.map((feature, index) => (
             <motion.div
-              key={index}
+              key={feature.title}
               className="feature-item"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -55,7 +61,6 @@ const Footer = () => {
         </div>
       </div>
 
-      {/* Main Footer */}
       <div className="footer-main">
         <motion.div
           className="footer-container"
@@ -64,67 +69,59 @@ const Footer = () => {
           whileInView="visible"
           viewport={{ once: true }}
         >
-          {/* Brand Column */}
           <motion.div className="footer-column" variants={itemVariants}>
             <div className="footer-brand">
               <div className="footer-logo">
                 <Glasses size={28} />
               </div>
-              <h3>Visionary</h3>
+              <h3>{t('brand.name')}</h3>
             </div>
-            <p className="footer-desc">
-              Premium eyeglasses crafted for style and comfort. Find your perfect pair today and see the world clearly.
-            </p>
+            <p className="footer-desc">{t('brand.description')}</p>
             <div className="footer-contact">
               <div className="contact-item">
                 <Mail size={16} />
-                <span>support@visionary.com</span>
+                <span>{t('brand.email')}</span>
               </div>
               <div className="contact-item">
                 <Phone size={16} />
-                <span>+1 (555) 123-4567</span>
+                <span>{t('brand.phone')}</span>
               </div>
               <div className="contact-item">
                 <MapPin size={16} />
-                <span>123 Fashion Ave, NY 10001</span>
+                <span>{t('brand.address')}</span>
               </div>
             </div>
           </motion.div>
 
-          {/* Quick Links */}
           <motion.div className="footer-column" variants={itemVariants}>
-            <h4 className="footer-title">Quick Links</h4>
+            <h4 className="footer-title">{t('footer.quickLinks')}</h4>
             <ul className="footer-links">
-              <li><Link to="/">Home</Link></li>
-              <li><Link to="/shop">Shop</Link></li>
-              <li><Link to="/cart">Cart</Link></li>
-              <li><Link to="/login">Login</Link></li>
-              <li><Link to="/register">Register</Link></li>
+              <li><Link to="/">{t('nav.home')}</Link></li>
+              <li><Link to="/shop">{t('nav.shop')}</Link></li>
+              <li><Link to="/cart">{t('nav.cart')}</Link></li>
+              <li><Link to="/login">{t('nav.login')}</Link></li>
+              <li><Link to="/register">{t('nav.register')}</Link></li>
             </ul>
           </motion.div>
 
-          {/* Categories */}
           <motion.div className="footer-column" variants={itemVariants}>
-            <h4 className="footer-title">Categories</h4>
+            <h4 className="footer-title">{t('footer.categories')}</h4>
             <ul className="footer-links">
-              <li><Link to="/shop">Men's Glasses</Link></li>
-              <li><Link to="/shop">Women's Glasses</Link></li>
-              <li><Link to="/shop">Kids' Glasses</Link></li>
-              <li><Link to="/shop">Sunglasses</Link></li>
-              <li><Link to="/shop">Blue Light</Link></li>
+              <li><Link to="/shop">{t('footer.mensGlasses')}</Link></li>
+              <li><Link to="/shop">{t('footer.womensGlasses')}</Link></li>
+              <li><Link to="/shop">{t('footer.kidsGlasses')}</Link></li>
+              <li><Link to="/shop">{t('footer.sunglasses')}</Link></li>
+              <li><Link to="/shop">{t('footer.blueLight')}</Link></li>
             </ul>
           </motion.div>
 
-          {/* Newsletter */}
           <motion.div className="footer-column" variants={itemVariants}>
-            <h4 className="footer-title">Newsletter</h4>
-            <p className="newsletter-desc">
-              Subscribe for exclusive offers and updates!
-            </p>
-            <form className="newsletter-form">
+            <h4 className="footer-title">{t('footer.newsletter')}</h4>
+            <p className="newsletter-desc">{t('footer.newsletterDesc')}</p>
+            <form className="newsletter-form" onSubmit={(e) => e.preventDefault()}>
               <input
                 type="email"
-                placeholder="Enter your email"
+                placeholder={t('common.emailPlaceholder')}
                 className="newsletter-input"
               />
               <motion.button
@@ -133,7 +130,7 @@ const Footer = () => {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                Subscribe
+                {t('common.subscribe')}
               </motion.button>
             </form>
             <div className="social-links">
@@ -159,16 +156,13 @@ const Footer = () => {
         </motion.div>
       </div>
 
-      {/* Bottom Bar */}
       <div className="footer-bottom">
         <div className="footer-bottom-container">
-          <p className="copyright">
-            © 2024 Visionary. All rights reserved.
-          </p>
+          <p className="copyright">{t('footer.copyright', { year })}</p>
           <div className="footer-bottom-links">
-            <Link to="/">Privacy Policy</Link>
-            <Link to="/">Terms of Service</Link>
-            <Link to="/">Cookie Policy</Link>
+            <Link to="/">{t('footer.privacy')}</Link>
+            <Link to="/">{t('footer.terms')}</Link>
+            <Link to="/">{t('footer.cookies')}</Link>
           </div>
         </div>
       </div>

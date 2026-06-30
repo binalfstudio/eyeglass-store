@@ -1,0 +1,72 @@
+.lang-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  flex-shrink: 0;
+  /* Never overflow the header */
+  white-space: nowrap;
+}
+
+.lang-switcher-compact {
+  padding: 0.12rem;
+}
+
+.lang-switcher-icon {
+  color: #6366f1;
+  margin-left: 0.35rem;
+}
+
+.lang-btn {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  /* Comfortable touch target — at least 32px */
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0.3rem 0.5rem;
+  border-radius: 999px;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.2s ease, color 0.2s ease;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lang-btn-active {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+
+.lang-btn:not(.lang-btn-active):hover {
+  color: #6366f1;
+}
+
+/* In the mobile drawer, give it full size */
+.mobile-menu .lang-switcher {
+  align-self: flex-start;
+}
+
+.mobile-menu .lang-btn {
+  min-height: 40px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.875rem;
+}
+
+/* On very small screens shrink the buttons slightly */
+@media (max-width: 380px) {
+  .lang-btn {
+    font-size: 0.68rem;
+    min-height: 28px;
+    min-width: 28px;
+    padding: 0.25rem 0.4rem;
+  }
+}

@@ -2,6 +2,13 @@ const mysql = require('mysql2');
 const { getMysqlConfig } = require('../utils/securityConfig');
 
 const dbConfig = getMysqlConfig();
+let connection;
+let lastConnectionError = null;
+
+const rememberConnectionError = (context, err) => {
+    lastConnectionError = err;
+    console.error(`${context}:`, err);
+};
 
 // First connect without database to create it if needed
 const tempConnection = mysql.createConnection({
@@ -13,13 +20,13 @@ const tempConnection = mysql.createConnection({
 
 tempConnection.connect((err) => {
     if (err) {
-        console.error('MySQL connection failed:', err);
+        rememberConnectionError('MySQL connection failed', err);
         return;
     }
     
     tempConnection.query(`CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\``, (err) => {
         if (err) {
-            console.error('Error creating database:', err);
+            rememberConnectionError('Error creating database', err);
             return;
         }
         console.log(`Database ${dbConfig.database} is ready`);
@@ -29,8 +36,6 @@ tempConnection.connect((err) => {
         initializeConnection();
     });
 });
-
-let connection;
 
 function initializeConnection() {
     connection = mysql.createConnection({
@@ -43,9 +48,11 @@ function initializeConnection() {
 
     connection.connect((err) => {
         if (err) {
-            console.error('MySQL connection failed:', err);
+            connection = null;
+            rememberConnectionError('MySQL connection failed', err);
             return;
         }
+        lastConnectionError = null;
         console.log('MySQL connected successfully');
         
         // Create categories table
@@ -83,6 +90,7 @@ function initializeConnection() {
                 image_url VARCHAR(512) DEFAULT NULL,
                 prescription_required TINYINT(1) NOT NULL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 CONSTRAINT fk_eyeglasses_category
                     FOREIGN KEY (category_id) REFERENCES categories(id)
                     ON DELETE SET NULL
@@ -105,6 +113,7 @@ function initializeConnection() {
                     `ALTER TABLE eyeglasses ADD COLUMN IF NOT EXISTS selling_price DECIMAL(12, 2) NOT NULL DEFAULT 0.00`,
                     `ALTER TABLE eyeglasses ADD COLUMN IF NOT EXISTS image_url VARCHAR(512) DEFAULT NULL`,
                     `ALTER TABLE eyeglasses ADD COLUMN IF NOT EXISTS prescription_required TINYINT(1) NOT NULL DEFAULT 0`,
+                    `ALTER TABLE eyeglasses ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
                 ];
                 alterQueries.forEach((q) => connection.query(q, () => {}));
             }
@@ -294,9 +303,72 @@ function initializeConnection() {
                 console.log('Admin notifications table is ready');
             }
         });
+
+        // Create payment_screenshots table
+        const createPaymentScreenshotsTableQuery = `
+            CREATE TABLE IF NOT EXISTS payment_screenshots (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                order_id INT NOT NULL,
+                user_id INT NOT NULL,
+                screenshot_path VARCHAR(1024) NOT NULL,
+                original_name VARCHAR(512) NOT NULL,
+                notes TEXT DEFAULT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                admin_note TEXT DEFAULT NULL,
+                reviewed_at TIMESTAMP NULL DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT fk_ps_order
+                    FOREIGN KEY (order_id) REFERENCES orders(id)
+                    ON DELETE CASCADE,
+                CONSTRAINT fk_ps_user
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                    ON DELETE CASCADE,
+                INDEX idx_ps_user_id (user_id),
+                INDEX idx_ps_order_id (order_id),
+                INDEX idx_ps_status (status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        `;
+
+        connection.query(createPaymentScreenshotsTableQuery, (err) => {
+            if (err) {
+                console.error('Error creating payment_screenshots table:', err);
+            } else {
+                console.log('Payment screenshots table is ready');
+            }
+        });
+
+        // Create user_notifications table (for notifying individual users)
+        const createUserNotificationsTableQuery = `
+            CREATE TABLE IF NOT EXISTS user_notifications (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                type VARCHAR(80) NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                message TEXT NOT NULL,
+                metadata JSON DEFAULT NULL,
+                is_read TINYINT(1) NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT fk_un_user
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                    ON DELETE CASCADE,
+                INDEX idx_un_user_id (user_id),
+                INDEX idx_un_is_read (is_read),
+                INDEX idx_un_created_at (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        `;
+
+        connection.query(createUserNotificationsTableQuery, (err) => {
+            if (err) {
+                console.error('Error creating user_notifications table:', err);
+            } else {
+                console.log('User notifications table is ready');
+            }
+        });
     });
 }
 
 module.exports = {
-    getConnection: () => connection
+    getConnection: () => connection,
+    isDatabaseConnected: () => Boolean(connection),
+    getDatabaseError: () => lastConnectionError,
 };

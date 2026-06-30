@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useLoginMutation } from '../redux/api/auth'
 import { useAddToCartMutation } from '../redux/api/cart'
 import './Auth.css'
 
 const Login = () => {
+  const { t } = useTranslation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const navigate = useNavigate()
@@ -55,7 +57,7 @@ const Login = () => {
       window.dispatchEvent(new Event('cart-change'))
       navigate('/')
     } catch (error) {
-      const message = error?.data?.message || error?.error || 'Login failed'
+      const message = error?.data?.message || error?.error || t('auth.loginFailed')
       alert(message)
     }
   }
@@ -63,29 +65,29 @@ const Login = () => {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>Welcome Back</h1>
-        <p>Sign in to your account</p>
+        <h1>{t('auth.welcomeBack')}</h1>
+        <p>{t('auth.signInSubtitle')}</p>
         <form onSubmit={handleSubmit}>
           <input
             type="email"
-            placeholder="Email"
+            placeholder={t('auth.email')}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
           />
           <input
             type="password"
-            placeholder="Password"
+            placeholder={t('auth.password')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
           <button type="submit" className="btn btn-primary" disabled={isLoading}>
-            {isLoading ? 'Signing in...' : 'Sign In'}
+            {isLoading ? t('auth.signingIn') : t('auth.signIn')}
           </button>
         </form>
         <p className="auth-link">
-          Don't have an account? <Link to="/register">Sign up</Link>
+          {t('auth.noAccount')} <Link to="/register">{t('auth.signUpLink')}</Link>
         </p>
       </div>
     </div>

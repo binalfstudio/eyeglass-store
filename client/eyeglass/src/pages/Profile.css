@@ -197,6 +197,7 @@
 @media (max-width: 768px) {
   .profile-page {
     padding-top: 7rem;
+    padding-bottom: 2rem;
   }
 
   .profile-card {
@@ -205,6 +206,7 @@
 
   .profile-header {
     align-items: flex-start;
+    flex-wrap: wrap;
   }
 
   .profile-grid {
@@ -219,5 +221,44 @@
   .profile-save-btn,
   .profile-remove-btn {
     justify-content: center;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-page {
+    padding-top: 6rem;
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+  }
+
+  .profile-avatar-wrap {
+    width: 90px;
+    height: 90px;
+  }
+
+  .profile-avatar {
+    width: 90px;
+    height: 90px;
+  }
+
+  .profile-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .profile-header > div {
+    width: 100%;
+  }
+
+  .profile-card {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .profile-grid input {
+    font-size: 1rem; /* prevent iOS zoom */
   }
 }

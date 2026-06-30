@@ -1,4 +1,12 @@
-const { getConnection } = require('../config/mysql');
+const { getConnection, getDatabaseError } = require('../config/mysql');
+
+const sendDatabaseUnavailable = (res) => {
+  const dbError = getDatabaseError();
+  return res.status(503).json({
+    message: 'Database not connected',
+    detail: dbError?.message || 'MySQL connection is not available',
+  });
+};
 
 // @desc    Get all eyeglasses
 // @route   GET /api/eyeglasses
@@ -6,6 +14,10 @@ const { getConnection } = require('../config/mysql');
 const getEyeglasses = async (req, res) => {
   try {
     const connection = getConnection();
+    if (!connection) {
+      return sendDatabaseUnavailable(res);
+    }
+
     const query = `
       SELECT e.*, c.name as category_name 
       FROM eyeglasses e 
@@ -16,7 +28,7 @@ const getEyeglasses = async (req, res) => {
     connection.query(query, (err, results) => {
       if (err) {
         console.error('Error fetching eyeglasses:', err);
-        return res.status(500).json({ message: 'Error fetching eyeglasses' });
+        return res.status(500).json({ message: 'Error fetching eyeglasses', detail: err.message });
       }
       res.json(results);
     });
@@ -66,6 +78,10 @@ const getAdminLowStock = async (req, res) => {
 const getEyeglass = async (req, res) => {
   try {
     const connection = getConnection();
+    if (!connection) {
+      return sendDatabaseUnavailable(res);
+    }
+
     const query = `
       SELECT e.*, c.name as category_name 
       FROM eyeglasses e 

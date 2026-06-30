@@ -14,7 +14,7 @@ export const authApi = createApi({
       return headers
     },
   }),
-  tagTypes: ['Profile'],
+  tagTypes: ['Profile', 'UserNotifications'],
   endpoints: (builder) => ({
     login: builder.mutation({
       query: (credentials) => ({
@@ -42,6 +42,24 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['Profile'],
     }),
+    getUserNotifications: builder.query({
+      query: () => '/users/notifications',
+      providesTags: ['UserNotifications'],
+    }),
+    markUserNotificationRead: builder.mutation({
+      query: (id) => ({
+        url: `/users/notifications/${id}/read`,
+        method: 'PUT',
+      }),
+      invalidatesTags: ['UserNotifications'],
+    }),
+    markAllUserNotificationsRead: builder.mutation({
+      query: () => ({
+        url: '/users/notifications/read-all',
+        method: 'PUT',
+      }),
+      invalidatesTags: ['UserNotifications'],
+    }),
   }),
 })
 
@@ -50,4 +68,7 @@ export const {
   useRegisterMutation,
   useGetProfileQuery,
   useUpdateProfileMutation,
+  useGetUserNotificationsQuery,
+  useMarkUserNotificationReadMutation,
+  useMarkAllUserNotificationsReadMutation,
 } = authApi

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { Camera, Save, UserCircle2, ShieldCheck, User } from 'lucide-react'
 import { useGetProfileQuery, useUpdateProfileMutation } from '../redux/api/auth'
 import './Profile.css'
 
 const Profile = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const token = localStorage.getItem('token')
   const { data: profile, isLoading, isError, error, refetch } = useGetProfileQuery(undefined, {
@@ -41,7 +43,10 @@ const Profile = () => {
     })
   }, [profile])
 
-  const roleLabel = useMemo(() => (profile?.isAdmin ? 'Administrator' : 'User'), [profile])
+  const roleLabel = useMemo(
+    () => (profile?.isAdmin ? t('profile.administrator') : t('profile.user')),
+    [profile, t]
+  )
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -53,12 +58,12 @@ const Profile = () => {
     if (!file) return
 
     if (!file.type.startsWith('image/')) {
-      setErrorMessage('Please select a valid image file.')
+      setErrorMessage(t('profile.invalidImage'))
       return
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      setErrorMessage('Please choose an image smaller than 2 MB.')
+      setErrorMessage(t('profile.imageTooLarge'))
       return
     }
 
@@ -101,12 +106,12 @@ const Profile = () => {
       }
       localStorage.setItem('user', JSON.stringify(mergedUser))
       window.dispatchEvent(new Event('auth-change'))
-      setStatus('Profile saved successfully.')
+      setStatus(t('profile.saved'))
     } catch (submitError) {
       setErrorMessage(
         submitError?.data?.message ||
         submitError?.error ||
-        'Failed to save profile.'
+        t('profile.saveFailed')
       )
     }
   }
@@ -116,7 +121,7 @@ const Profile = () => {
   if (isLoading) {
     return (
       <div className="profile-loading">
-        <p>Loading profile...</p>
+        <p>{t('profile.loading')}</p>
       </div>
     )
   }
@@ -124,9 +129,9 @@ const Profile = () => {
   if (isError) {
     return (
       <div className="profile-error">
-        <h2>Could not load profile</h2>
-        <p>{error?.data?.message || 'Please try again.'}</p>
-        <button onClick={refetch} type="button">Retry</button>
+        <h2>{t('profile.loadError')}</h2>
+        <p>{error?.data?.message || t('common.tryAgain')}</p>
+        <button onClick={refetch} type="button">{t('common.tryAgain')}</button>
       </div>
     )
   }
@@ -149,7 +154,7 @@ const Profile = () => {
             )}
             <label className="profile-image-picker" htmlFor="profile-image-input">
               <Camera size={15} />
-              <span>Upload</span>
+              <span>{t('profile.upload')}</span>
             </label>
             <input
               id="profile-image-input"
@@ -161,8 +166,8 @@ const Profile = () => {
           </div>
 
           <div>
-            <h1>My Profile</h1>
-            <p>Update your account details and profile picture.</p>
+            <h1>{t('profile.title')}</h1>
+            <p>{t('profile.subtitle')}</p>
             <div className="profile-role-chip">
               {profile?.isAdmin ? <ShieldCheck size={14} /> : <User size={14} />}
               <span>{roleLabel}</span>
@@ -173,33 +178,33 @@ const Profile = () => {
         <form className="profile-form" onSubmit={handleSubmit}>
           <div className="profile-grid">
             <label>
-              Full Name
+              {t('profile.fullName')}
               <input name="name" value={formData.name} onChange={handleChange} required />
             </label>
 
             <label>
-              Email
+              {t('profile.email')}
               <input name="email" value={formData.email} disabled />
             </label>
 
             <label>
-              Phone
-              <input name="phone" value={formData.phone} onChange={handleChange} placeholder="e.g. +251..." />
+              {t('profile.phone')}
+              <input name="phone" value={formData.phone} onChange={handleChange} placeholder={t('profile.phonePlaceholder')} />
             </label>
 
             <label>
-              Address
-              <input name="address" value={formData.address} onChange={handleChange} placeholder="City, sub-city, house no." />
+              {t('profile.address')}
+              <input name="address" value={formData.address} onChange={handleChange} placeholder={t('profile.addressPlaceholder')} />
             </label>
           </div>
 
           <div className="profile-actions">
             <button type="submit" className="profile-save-btn" disabled={isSaving}>
               <Save size={16} />
-              <span>{isSaving ? 'Saving...' : 'Save Profile'}</span>
+              <span>{isSaving ? t('profile.saving') : t('profile.saveProfile')}</span>
             </button>
             <button type="button" className="profile-remove-btn" onClick={removeImage}>
-              Remove Picture
+              {t('profile.removePicture')}
             </button>
           </div>
 

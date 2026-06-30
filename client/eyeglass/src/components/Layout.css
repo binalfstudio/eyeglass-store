@@ -2,9 +2,23 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background:
+    radial-gradient(900px circle at 0% -10%, rgba(99, 102, 241, 0.11), transparent 55%),
+    radial-gradient(700px circle at 100% 0%, rgba(236, 72, 153, 0.08), transparent 50%),
+    radial-gradient(600px circle at 50% 100%, rgba(6, 182, 212, 0.06), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  /* Prevent horizontal scroll from any child */
+  overflow-x: hidden;
 }
 
 .main-content {
   flex: 1;
-  padding-top: 80px;
+  /* Fluid top padding that accounts for fixed header height */
+  padding-top: clamp(72px, 10vw, 88px);
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding-top: 72px;
+  }
 }

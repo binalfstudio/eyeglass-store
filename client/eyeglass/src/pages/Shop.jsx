@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useTranslation, Trans } from 'react-i18next'
 import { useGetEyeglassesQuery } from '../redux/api/eyeglasses'
 import { useGetCategoriesQuery } from '../redux/api/categories'
 import { useAddToCartMutation } from '../redux/api/cart'
@@ -58,9 +59,26 @@ const excludedProductNames = new Set([
   'modern rectangular glass',
 ])
 
+const getApiErrorMessage = (error, t) => {
+  const status = error?.status
+  const message = error?.data?.message || error?.error || t('shop.loadFailed')
+  const detail = error?.data?.detail
+
+  if (status === 'FETCH_ERROR' || String(message).toLowerCase().includes('fetch failed')) {
+    return t('shop.serverUnreachable')
+  }
+
+  if (message === 'Database not connected' || detail?.toLowerCase?.().includes('mysql')) {
+    return detail ? `${message}: ${detail}` : message
+  }
+
+  return detail ? `${message}: ${detail}` : message
+}
+
 const Shop = () => {
+  const { t } = useTranslation()
   const { data: eyeglasses, isLoading, error } = useGetEyeglassesQuery()
-  const { data: categories } = useGetCategoriesQuery()
+  const { data: categories, error: categoriesError } = useGetCategoriesQuery()
   const [addToCartApi] = useAddToCartMutation()
   const prefersReducedMotion = useReducedMotion()
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -72,10 +90,23 @@ const Shop = () => {
   const [isCategoryPaused, setIsCategoryPaused] = useState(false)
 
   useEffect(() => {
-    const savedFavorites = localStorage.getItem('favorites')
-    const savedCart = localStorage.getItem('cart')
-    if (savedFavorites) setFavorites(JSON.parse(savedFavorites))
-    if (savedCart) setCart(JSON.parse(savedCart))
+    try {
+      const savedFavorites = localStorage.getItem('favorites')
+      const parsedFavorites = savedFavorites ? JSON.parse(savedFavorites) : []
+      setFavorites(Array.isArray(parsedFavorites) ? parsedFavorites : [])
+    } catch {
+      localStorage.removeItem('favorites')
+      setFavorites([])
+    }
+
+    try {
+      const savedCart = localStorage.getItem('cart')
+      const parsedCart = savedCart ? JSON.parse(savedCart) : []
+      setCart(Array.isArray(parsedCart) ? parsedCart : [])
+    } catch {
+      localStorage.removeItem('cart')
+      setCart([])
+    }
   }, [])
 
   const visibleEyeglasses = useMemo(
@@ -88,8 +119,11 @@ const Shop = () => {
 
   const filteredProducts = visibleEyeglasses.filter(product => {
     const matchesCategory = selectedCategory === 'all' || product.category_id === parseInt(selectedCategory)
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         product.brand?.toLowerCase().includes(searchQuery.toLowerCase())
+    const productName = product.name || ''
+    const productBrand = product.brand || ''
+    const normalizedSearch = searchQuery.toLowerCase()
+    const matchesSearch = productName.toLowerCase().includes(normalizedSearch) ||
+                         productBrand.toLowerCase().includes(normalizedSearch)
     return matchesCategory && matchesSearch
   })
 
@@ -139,7 +173,7 @@ const Shop = () => {
       try {
         await addToCartApi({ eyeglass_id: product.id, quantity: 1 }).unwrap()
         window.dispatchEvent(new Event('cart-change'))
-        showCartNotification('Added to cart!')
+        showCartNotification(t('common.addedToCart'))
         return
       } catch (apiError) {
         const message = apiError?.data?.message || 'Unable to add this item right now.'
@@ -164,7 +198,7 @@ const Shop = () => {
     setCart(newCart)
     localStorage.setItem('cart', JSON.stringify(newCart))
     window.dispatchEvent(new Event('cart-change'))
-    showCartNotification('Added to cart!')
+    showCartNotification(t('common.addedToCart'))
   }
 
   const formatPrice = (value) => etbFormatter.format(Number(value) || 0)
@@ -185,7 +219,7 @@ const Shop = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <p className="loading-text">Loading amazing eyewear...</p>
+            <p className="loading-text">{t('shop.loading')}</p>
             <div className="loading-dots">
               <motion.span 
                 animate={{ opacity: [0, 1, 0] }}
@@ -224,11 +258,18 @@ const Shop = () => {
     )
   }
 
-  if (error) {
+  const apiError = error || categoriesError
+
+  if (apiError) {
+    const errorMessage = getApiErrorMessage(apiError, t)
+
     return (
       <div className="shop-error">
-        <p>Oops! Something went wrong.</p>
-        <button onClick={() => window.location.reload()} className="retry-btn">Try Again</button>
+        <Glasses size={44} />
+        <h2>{apiError?.status === 'FETCH_ERROR' ? t('shop.serverError') : t('shop.dbError')}</h2>
+        <p>{errorMessage}</p>
+        <small>{apiError?.status === 'FETCH_ERROR' ? t('shop.serverErrorHint') : t('shop.dbErrorHint')}</small>
+        <button onClick={() => window.location.reload()} className="retry-btn">{t('common.tryAgain')}</button>
       </div>
     )
   }
@@ -302,7 +343,7 @@ const Shop = () => {
               >
                 <Sparkles size={18} />
               </motion.div>
-              <span>New Collection 2024</span>
+              <span>{t('shop.newCollection')}</span>
             </motion.div>
 
             <motion.h1 
@@ -311,9 +352,9 @@ const Shop = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6, duration: 0.8 }}
             >
-              <span className="title-line">Discover Your</span>
-              <span className="title-line highlight-gradient">Perfect Vision</span>
-              <span className="title-line">With Style</span>
+              <span className="title-line">{t('shop.heroLine1')}</span>
+              <span className="title-line highlight-gradient">{t('shop.heroLine2')}</span>
+              <span className="title-line">{t('shop.heroLine3')}</span>
             </motion.h1>
 
             <motion.p 
@@ -322,9 +363,7 @@ const Shop = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8, duration: 0.6 }}
             >
-              Explore our curated collection of premium eyeglasses. 
-              From classic frames to modern designs, find the perfect pair 
-              that matches your personality.
+              {t('shop.heroDesc')}
             </motion.p>
 
             <motion.div 
@@ -340,7 +379,7 @@ const Shop = () => {
                 onClick={() => document.querySelector('.products-grid')?.scrollIntoView({ behavior: 'smooth' })}
               >
                 <ShoppingBag size={20} />
-                Shop Now
+                {t('shop.shopNow')}
               </motion.button>
               <motion.button 
                 className="cta-secondary"
@@ -348,7 +387,7 @@ const Shop = () => {
                 whileTap={{ scale: 0.95 }}
               >
                 <Glasses size={20} />
-                View Collection
+                {t('shop.viewCollection')}
               </motion.button>
             </motion.div>
 
@@ -367,7 +406,7 @@ const Shop = () => {
                 >
                   {visibleEyeglasses.length || 0}+
                 </motion.span>
-                <span className="stat-text">Premium Styles</span>
+                <span className="stat-text">{t('shop.premiumStyles')}</span>
               </div>
               <div className="stat-box">
                 <motion.span 
@@ -378,7 +417,7 @@ const Shop = () => {
                 >
                   50K+
                 </motion.span>
-                <span className="stat-text">Happy Customers</span>
+                <span className="stat-text">{t('shop.happyCustomers')}</span>
               </div>
               <div className="stat-box">
                 <motion.span 
@@ -389,7 +428,7 @@ const Shop = () => {
                 >
                   4.9
                 </motion.span>
-                <span className="stat-text">Rating</span>
+                <span className="stat-text">{t('shop.rating')}</span>
               </div>
             </motion.div>
           </motion.div>
@@ -427,7 +466,7 @@ const Shop = () => {
             viewport={{ once: true }}
           >
             <Sparkles size={16} />
-            Browse by Category
+            {t('shop.browseCategory')}
           </motion.span>
           <motion.h2 
             className="section-title"
@@ -436,7 +475,7 @@ const Shop = () => {
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
           >
-            Find Your Perfect Style
+            {t('shop.findStyle')}
           </motion.h2>
         </div>
         
@@ -512,12 +551,12 @@ const Shop = () => {
               </div>
               <div className="category-card-content">
                 <h3>{category.name}</h3>
-                <p>{visibleEyeglasses.filter(p => p.category_id === category.id).length || 0} Products</p>
+                <p>{t('shop.productsCount', { count: visibleEyeglasses.filter(p => p.category_id === category.id).length || 0 })}</p>
                 <motion.button 
                   className="explore-btn"
                   whileHover={{ x: 5 }}
                 >
-                  Explore <ChevronRight size={16} />
+                  {t('shop.explore')} <ChevronRight size={16} />
                 </motion.button>
               </div>
               {selectedCategory === category.id.toString() && (
@@ -544,10 +583,10 @@ const Shop = () => {
       >
         <div className="benefits-grid">
           {[
-            { icon: Truck, title: 'Free Shipping', desc: `On orders over ${formatPrice(100)}`, color: '#10b981' },
-            { icon: Shield, title: '2 Year Warranty', desc: 'Full coverage protection', color: '#6366f1' },
-            { icon: RefreshCw, title: 'Easy Returns', desc: '30-day return policy', color: '#ec4899' },
-            { icon: Headphones, title: '24/7 Support', desc: 'Always here to help', color: '#f59e0b' },
+            { icon: Truck, title: t('shop.benefits.shipping.title'), desc: t('shop.benefits.shipping.desc', { amount: formatPrice(100) }), color: '#10b981' },
+            { icon: Shield, title: t('shop.benefits.warranty.title'), desc: t('shop.benefits.warranty.desc'), color: '#6366f1' },
+            { icon: RefreshCw, title: t('shop.benefits.returns.title'), desc: t('shop.benefits.returns.desc'), color: '#ec4899' },
+            { icon: Headphones, title: t('shop.benefits.support.title'), desc: t('shop.benefits.support.desc'), color: '#f59e0b' },
           ].map((benefit, index) => (
             <motion.div
               key={benefit.title}
@@ -596,7 +635,7 @@ const Shop = () => {
             </motion.div>
             <input
               type="text"
-              placeholder="Search styles, brands..."
+              placeholder={t('shop.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -636,7 +675,7 @@ const Shop = () => {
                     : 'transparent'
                 }}
               >
-                All Styles
+                {t('shop.allStyles')}
               </motion.span>
               {selectedCategory === 'all' && (
                 <motion.div
@@ -674,7 +713,7 @@ const Shop = () => {
 
       {/* Results */}
       <div className="shop-results">
-        <p>Showing <strong>{filteredProducts?.length || 0}</strong> products</p>
+        <p><Trans i18nKey="shop.showingProducts" values={{ count: filteredProducts?.length || 0 }} components={{ strong: <strong /> }} /></p>
       </div>
 
       {/* Products Grid - Enhanced with Better Animations */}
@@ -763,7 +802,7 @@ const Shop = () => {
                       whileHover={{ x: 5, gap: '0.5rem' }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      View Details <ChevronRight size={16} />
+                      {t('shop.viewDetails')} <ChevronRight size={16} />
                     </motion.button>
                   </div>
                 </motion.div>
@@ -781,7 +820,7 @@ const Shop = () => {
                       animate={{ scale: 1 }}
                       transition={{ type: "spring", stiffness: 500, damping: 25 }}
                     >
-                      RX Required
+                      {t('common.rxRequired')}
                     </motion.span>
                   )}
                   {product.quantity_in_stock < 10 && (
@@ -791,7 +830,7 @@ const Shop = () => {
                       animate={{ scale: 1 }}
                       transition={{ type: "spring", stiffness: 500, damping: 25, delay: 0.1 }}
                     >
-                      Low Stock
+                      {t('common.lowStock')}
                     </motion.span>
                   )}
                 </motion.div>
@@ -844,14 +883,14 @@ const Shop = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            No products found
+            {t('shop.noProducts')}
           </motion.h3>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            Try adjusting your filters or search terms
+            {t('shop.noProductsHint')}
           </motion.p>
           <motion.button 
             onClick={() => {setSelectedCategory('all'); setSearchQuery('')}} 
@@ -862,7 +901,7 @@ const Shop = () => {
             whileHover={{ scale: 1.05, boxShadow: '0 10px 25px rgba(99, 102, 241, 0.3)' }}
             whileTap={{ scale: 0.95 }}
           >
-            Clear Filters
+            {t('shop.clearFilters')}
           </motion.button>
         </motion.div>
       )}
@@ -905,15 +944,15 @@ const Shop = () => {
                   
                   <div className="quick-view-specs">
                     <div className="spec-row">
-                      <span>Frame Type</span>
+                      <span>{t('shop.frameType')}</span>
                       <strong>{quickViewProduct.frame_type}</strong>
                     </div>
                     <div className="spec-row">
-                      <span>Frame Material</span>
+                      <span>{t('shop.frameMaterial')}</span>
                       <strong>{quickViewProduct.frame_material}</strong>
                     </div>
                     <div className="spec-row">
-                      <span>Lens Type</span>
+                      <span>{t('shop.lensType')}</span>
                       <strong>{quickViewProduct.lens_type}</strong>
                     </div>
                   </div>
@@ -931,7 +970,7 @@ const Shop = () => {
                       whileTap={{ scale: 0.98 }}
                     >
                       <ShoppingBag size={20} />
-                      Add to Cart
+                      {t('home.addToCart')}
                     </motion.button>
                     
                     <motion.button 
@@ -951,7 +990,7 @@ const Shop = () => {
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.98 }}
                     >
-                      Try On
+                      {t('shop.tryOn')}
                     </motion.button>
                   </div>
                 </div>
@@ -976,7 +1015,7 @@ const Shop = () => {
             viewport={{ once: true }}
           >
             <Star size={16} fill="currentColor" />
-            Featured Collection
+            {t('shop.featuredCollection')}
           </motion.span>
           <motion.h2 
             className="section-title"
@@ -985,7 +1024,7 @@ const Shop = () => {
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
           >
-            Editor's Picks
+            {t('shop.editorsPicks')}
           </motion.h2>
         </div>
         
@@ -1003,7 +1042,7 @@ const Shop = () => {
             >
               <div className="featured-badge">
                 <Sparkles size={14} />
-                Featured
+                {t('shop.featured')}
               </div>
               <div className="featured-image">
                 <img src={product.image_url} alt={product.name} />
@@ -1044,7 +1083,7 @@ const Shop = () => {
         transition={{ duration: 0.8 }}
       >
         <div className="section-header">
-          <h3>Trusted by Leading Brands</h3>
+          <h3>{t('shop.trustedBrands')}</h3>
         </div>
         <div className="brand-marquee">
           <motion.div 
@@ -1089,8 +1128,8 @@ const Shop = () => {
             viewport={{ once: true }}
             transition={{ delay: 0.2 }}
           >
-            <h3>Stay in the Loop</h3>
-            <p>Subscribe to get exclusive offers, early access to new arrivals, and style tips.</p>
+            <h3>{t('shop.stayInLoop')}</h3>
+            <p>{t('shop.newsletterDesc')}</p>
           </motion.div>
           <motion.form 
             className="newsletter-form"
@@ -1100,13 +1139,13 @@ const Shop = () => {
             transition={{ delay: 0.3 }}
             onSubmit={(e) => e.preventDefault()}
           >
-            <input type="email" placeholder="Enter your email" required />
+            <input type="email" placeholder={t('common.emailPlaceholder')} required />
             <motion.button 
               type="submit"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              Subscribe
+              {t('common.subscribe')}
             </motion.button>
           </motion.form>
         </div>

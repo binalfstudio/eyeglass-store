@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { CheckCircle2, AlertTriangle, Loader2, ArrowRight, ShoppingCart } from 'lucide-react'
 import { useDispatch } from 'react-redux'
@@ -42,6 +43,7 @@ const getReadableError = (error, fallbackMessage) => {
 }
 
 const PaymentResult = () => {
+  const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
   const token = localStorage.getItem('token')
@@ -51,7 +53,11 @@ const PaymentResult = () => {
   const [fetchPendingSession] = useLazyGetPendingPaymentSessionQuery()
 
   const [status, setStatus] = useState('loading')
-  const [message, setMessage] = useState('Verifying your payment...')
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    setMessage(t('payment.verifying'))
+  }, [t])
 
   const params = useMemo(() => new URLSearchParams(location.search), [location.search])
   const txRef = useMemo(() => resolvePaymentTxRef(location.search), [location.search])
@@ -72,19 +78,19 @@ const PaymentResult = () => {
 
       if (!paymentRef) {
         setStatus('error')
-        setMessage('Missing payment reference. Please try checkout again.')
+        setMessage(t('payment.missingRef'))
         return
       }
 
       if (incomingStatus === 'cancelled' || incomingStatus === 'failed') {
         setStatus('cancelled')
-        setMessage('Payment was cancelled. Your cart items are still saved.')
+        setMessage(t('payment.cancelledSaved'))
         return
       }
 
       if (!token) {
         setStatus('error')
-        setMessage('Please log in to complete payment verification.')
+        setMessage(t('payment.loginToVerify'))
         return
       }
 
@@ -99,21 +105,28 @@ const PaymentResult = () => {
         dispatch(cartApi.util.invalidateTags(['Cart']))
         clearPendingTxRef()
         setStatus('success')
-        setMessage('Payment successful. Your order has been confirmed.')
+        setMessage(t('payment.success'))
       } catch (error) {
         setStatus('error')
-        setMessage(getReadableError(error, 'Payment was received, but confirmation failed. Please contact support with your tx_ref.'))
+        setMessage(getReadableError(error, t('payment.confirmFailed')))
       }
     }
 
     run()
-  }, [clearCart, confirmPaymentSession, dispatch, fetchPendingSession, incomingStatus, token, txRef])
+  }, [clearCart, confirmPaymentSession, dispatch, fetchPendingSession, incomingStatus, t, token, txRef])
 
   useEffect(() => {
     if (status === 'success') {
       window.dispatchEvent(new Event('cart-change'))
     }
   }, [status])
+
+  const statusTitle = {
+    loading: t('payment.processing'),
+    success: t('payment.confirmed'),
+    cancelled: t('payment.cancelled'),
+    error: t('payment.failed'),
+  }
 
   return (
     <div className="payment-result-page">
@@ -129,18 +142,13 @@ const PaymentResult = () => {
           {(status === 'error' || status === 'cancelled') && <AlertTriangle size={44} />}
         </div>
 
-        <h1>
-          {status === 'loading' && 'Processing Payment'}
-          {status === 'success' && 'Payment Confirmed'}
-          {status === 'cancelled' && 'Payment Cancelled'}
-          {status === 'error' && 'Payment Verification Failed'}
-        </h1>
+        <h1>{statusTitle[status]}</h1>
 
         <p>{message}</p>
 
         {txRef && (
           <div className="payment-ref">
-            <span>Transaction Reference</span>
+            <span>{t('payment.txRef')}</span>
             <strong>{txRef}</strong>
           </div>
         )}
@@ -148,16 +156,16 @@ const PaymentResult = () => {
         <div className="payment-actions">
           {status === 'error' && !token ? (
             <button onClick={() => navigate('/login')} className="payment-btn primary">
-              Login <ArrowRight size={16} />
+              {t('nav.login')} <ArrowRight size={16} />
             </button>
           ) : (
             <button onClick={() => navigate('/cart')} className="payment-btn primary">
-              View Cart <ShoppingCart size={16} />
+              {t('payment.viewCart')} <ShoppingCart size={16} />
             </button>
           )}
 
           <button onClick={() => navigate('/shop')} className="payment-btn ghost">
-            Continue Shopping <ArrowRight size={16} />
+            {t('common.continueShopping')} <ArrowRight size={16} />
           </button>
         </div>
       </motion.div>

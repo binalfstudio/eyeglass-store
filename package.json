@@ -1,10 +1,11 @@
 {
   "name": "eyeglass-store",
   "version": "1.0.0",
-  "description": "Eyeglass Store - Fullstack E-commerce Application",
+  "description": "Z Visionary (ዜድ መነጸር) — Ethiopian Eyeglass E-commerce",
   "main": "index.js",
   "scripts": {
-    "dev": "npm run dev --prefix client/eyeglass",
+    "dev": "node scripts/fullstack.js",
+    "dev:client": "npm run dev --prefix client/eyeglass",
     "build": "npm run build --prefix client/eyeglass",
     "preview": "npm run preview --prefix client/eyeglass",
     "test": "echo \"Error: no test specified\" && exit 1",
