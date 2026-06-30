@@ -80,19 +80,9 @@ app.use('/api', (req, res) => {
   res.status(404).json({ message: 'API route not found' });
 });
 
-// ── Serve React frontend in production ──────────────────
-if (process.env.NODE_ENV === 'production') {
-  const clientBuildPath = path.join(__dirname, '../../client/eyeglass/dist');
-  app.use(express.static(clientBuildPath));
-  // All non-API routes return the React app (client-side routing)
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(clientBuildPath, 'index.html'));
-  });
-} else {
-  app.get('/', (req, res) => {
-    res.json({ message: 'Welcome to Z Visionary (ዜድ መነጸር) API' });
-  });
-}
+app.get('/', (req, res) => {
+  res.json({ message: 'Welcome to Z Visionary (ዜድ መነጸር) API' });
+});
 
 app.use((err, req, res, next) => {
   if (err?.type === 'entity.too.large') {
