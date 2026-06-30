@@ -1,6 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+import { API_BASE_URL } from '../../utils/apiConfig'
 
 export const screenshotPaymentApi = createApi({
   reducerPath: 'screenshotPaymentApi',

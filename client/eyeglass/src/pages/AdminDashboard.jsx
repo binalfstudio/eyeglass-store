@@ -1,10 +1,12 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+﻿import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_BASE_URL } from '../utils/apiConfig';
 
-// Derive server base URL for static assets (works via Vite proxy when relative)
-const _API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
-const SERVER_BASE = _API_BASE.startsWith('http') ? _API_BASE.replace(/\/api\/?$/, '') : ''
+// Derive server base URL for static assets (uploads images)
+const SERVER_BASE = API_BASE_URL.startsWith('http')
+  ? API_BASE_URL.replace(/\/api\/?$/, '')
+  : ''
 const toServerUrl = (p) => (p ? `${SERVER_BASE}${p}` : '')
 
 import { 
@@ -203,7 +205,7 @@ const AdminDashboard = () => {
     try {
       setBootMessage('');
       // Fetch products
-      const productsRes = await fetch('/api/eyeglasses', {
+      const productsRes = await fetch(`${API_BASE_URL}/eyeglasses`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (productsRes.ok) {
@@ -212,7 +214,7 @@ const AdminDashboard = () => {
       }
 
       // Fetch categories
-      const categoriesRes = await fetch('/api/categories', {
+      const categoriesRes = await fetch(`${API_BASE_URL}/categories`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (categoriesRes.ok) {
@@ -221,7 +223,7 @@ const AdminDashboard = () => {
       }
 
       // Fetch admin profile
-      const profileRes = await fetch('/api/users/profile', {
+      const profileRes = await fetch(`${API_BASE_URL}/users/profile`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (profileRes.ok) {
@@ -262,7 +264,7 @@ const AdminDashboard = () => {
       }
 
       // Fetch admin notifications
-      const notificationsRes = await fetch('/api/users/admin/notifications', {
+      const notificationsRes = await fetch(`${API_BASE_URL}/users/admin/notifications`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (notificationsRes.ok) {
@@ -271,7 +273,7 @@ const AdminDashboard = () => {
       }
 
       // Fetch admin users
-      const usersRes = await fetch('/api/users/admin/users', {
+      const usersRes = await fetch(`${API_BASE_URL}/users/admin/users`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (usersRes.ok) {
@@ -280,7 +282,7 @@ const AdminDashboard = () => {
       }
 
       // Fetch admin orders & transactions
-      const ordersRes = await fetch('/api/payments/admin/orders', {
+      const ordersRes = await fetch(`${API_BASE_URL}/payments/admin/orders`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (ordersRes.ok) {
@@ -303,7 +305,7 @@ const AdminDashboard = () => {
       }
 
       // Fetch screenshot payments
-      const screenshotRes = await fetch('/api/screenshot-payments/admin/list', {
+      const screenshotRes = await fetch(`${API_BASE_URL}/screenshot-payments/admin/list`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (screenshotRes.ok) {
@@ -312,7 +314,12 @@ const AdminDashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching data:', error);
-      setBootMessage('Failed to load admin data. Make sure the backend is running on port 5000, then refresh.');
+      const isProd = import.meta.env.PROD;
+      setBootMessage(
+        isProd
+          ? 'Failed to connect to the server. Please try again in a moment â€” the backend may be waking up.'
+          : 'Failed to load admin data. Make sure the backend is running on port 5000, then refresh.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -331,7 +338,7 @@ const AdminDashboard = () => {
     if (!token) return;
 
     try {
-      const response = await fetch(`/api/users/admin/notifications/${notificationId}/read`, {
+      const response = await fetch(`${API_BASE_URL}/users/admin/notifications/${notificationId}/read`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -466,7 +473,7 @@ const AdminDashboard = () => {
     setProfileError('');
 
     try {
-      const response = await fetch('/api/users/profile', {
+      const response = await fetch(`${API_BASE_URL}/users/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -522,7 +529,7 @@ const AdminDashboard = () => {
 
     try {
       setIsUpdatingOrder(true);
-      const response = await fetch(`/api/payments/admin/orders/${orderId}/status`, {
+      const response = await fetch(`${API_BASE_URL}/payments/admin/orders/${orderId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -583,7 +590,7 @@ const AdminDashboard = () => {
 
     try {
       setIsBulkUpdatingOrders(true);
-      const response = await fetch('/api/payments/admin/orders/bulk-status', {
+      const response = await fetch(`${API_BASE_URL}/payments/admin/orders/bulk-status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -623,7 +630,7 @@ const AdminDashboard = () => {
 
     setScreenshotReviewLoading(true);
     try {
-      const response = await fetch(`/api/screenshot-payments/admin/${screenshotId}/review`, {
+      const response = await fetch(`${API_BASE_URL}/screenshot-payments/admin/${screenshotId}/review`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -662,10 +669,10 @@ const AdminDashboard = () => {
     }
   };
 
-  // Targeted re-fetch helpers — avoid re-loading 7 endpoints after each mutation
+  // Targeted re-fetch helpers â€” avoid re-loading 7 endpoints after each mutation
   const refetchOrders = async (token) => {
     try {
-      const res = await fetch('/api/payments/admin/orders', {
+      const res = await fetch(`${API_BASE_URL}/payments/admin/orders`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       if (res.ok) {
@@ -684,7 +691,7 @@ const AdminDashboard = () => {
 
   const refetchScreenshots = async (token) => {
     try {
-      const res = await fetch('/api/screenshot-payments/admin/list', {
+      const res = await fetch(`${API_BASE_URL}/screenshot-payments/admin/list`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       if (res.ok) {
@@ -696,7 +703,7 @@ const AdminDashboard = () => {
 
   const refetchNotifications = async (token) => {
     try {
-      const res = await fetch('/api/users/admin/notifications', {
+      const res = await fetch(`${API_BASE_URL}/users/admin/notifications`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       if (res.ok) {
@@ -1203,7 +1210,7 @@ const AdminDashboard = () => {
             </div>
             <div className="admin-brand-copy">
               <span>Z Visionary</span>
-              <small>ዜድ መነጸር · Admin</small>
+              <small>á‹œá‹µ áˆ˜áŠáŒ¸áˆ­ Â· Admin</small>
             </div>
           </div>
         </div>
@@ -1257,7 +1264,7 @@ const AdminDashboard = () => {
 
       {/* Main Content */}
       <main className="admin-main">
-        {/* Mobile top bar — only visible on small screens via CSS */}
+        {/* Mobile top bar â€” only visible on small screens via CSS */}
         <div className="admin-mobile-topbar">
           <button
             type="button"
@@ -1526,7 +1533,7 @@ const AdminDashboard = () => {
                             <span>Best Revenue Day</span>
                             <strong>
                               {activitySummary.bestDay?.shortLabel || '-'}
-                              {' · '}
+                              {' Â· '}
                               {etbFormatter.format(activitySummary.bestDay?.revenue || 0)}
                             </strong>
                           </div>
@@ -1584,7 +1591,7 @@ const AdminDashboard = () => {
                           <div key={row.key} className="admin-status-progress-row">
                             <div className="admin-status-progress-top">
                               <span>{row.label}</span>
-                              <strong>{row.count} • {row.percent}%</strong>
+                              <strong>{row.count} â€¢ {row.percent}%</strong>
                             </div>
                             <div className="admin-status-progress-track">
                               <div
@@ -2175,7 +2182,7 @@ const AdminDashboard = () => {
                             <div>
                               <strong>Order #{item.order_id}</strong>
                               <span className="admin-screenshot-customer">
-                                {item.customer_name || 'Unknown'} · {item.customer_email || '-'}
+                                {item.customer_name || 'Unknown'} Â· {item.customer_email || '-'}
                               </span>
                             </div>
                             <div className="admin-screenshot-amount">
@@ -2197,7 +2204,7 @@ const AdminDashboard = () => {
 
                           <p className="admin-screenshot-date">
                             Submitted: {new Date(item.created_at).toLocaleString()}
-                            {item.reviewed_at && ` · Reviewed: ${new Date(item.reviewed_at).toLocaleString()}`}
+                            {item.reviewed_at && ` Â· Reviewed: ${new Date(item.reviewed_at).toLocaleString()}`}
                           </p>
 
                           {item.status === 'pending' && (
@@ -2219,7 +2226,7 @@ const AdminDashboard = () => {
                                       disabled={screenshotReviewLoading}
                                       onClick={() => handleReviewScreenshotPayment(item.id, 'approve')}
                                     >
-                                      {screenshotReviewLoading ? 'Processing...' : '✓ Approve'}
+                                      {screenshotReviewLoading ? 'Processing...' : 'âœ“ Approve'}
                                     </button>
                                     <button
                                       type="button"
@@ -2227,7 +2234,7 @@ const AdminDashboard = () => {
                                       disabled={screenshotReviewLoading}
                                       onClick={() => handleReviewScreenshotPayment(item.id, 'reject')}
                                     >
-                                      {screenshotReviewLoading ? 'Processing...' : '✕ Reject'}
+                                      {screenshotReviewLoading ? 'Processing...' : 'âœ• Reject'}
                                     </button>
                                     <button
                                       type="button"
@@ -2558,3 +2565,5 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
+
+

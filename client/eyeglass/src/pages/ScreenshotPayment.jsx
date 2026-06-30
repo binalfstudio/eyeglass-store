@@ -8,13 +8,13 @@ import {
 } from 'lucide-react'
 import { useGetCartQuery } from '../redux/api/cart'
 import { useSubmitScreenshotPaymentMutation, useGetMySubmissionsQuery } from '../redux/api/screenshotPayment'
+import { API_BASE_URL } from '../utils/apiConfig'
 
 import './ScreenshotPayment.css'
 
-// Derive server base (strips /api suffix if present)
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
-const SERVER_BASE = API_BASE.startsWith('http')
-  ? API_BASE.replace(/\/api\/?$/, '')
+// Derive server base for image URLs (strips /api suffix)
+const SERVER_BASE = API_BASE_URL.startsWith('http')
+  ? API_BASE_URL.replace(/\/api\/?$/, '')
   : ''   // empty string → relative URL (works via Vite proxy)
 
 // ── Bank / payment details shown to the user ────────────────────────────────
