@@ -9,6 +9,8 @@
   left: 0;
   right: 0;
   z-index: 1000;
+  /* Allow dropdown to overflow above this stacking context */
+  overflow: visible;
   padding: 0.6rem 0;
   transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   /* Glassmorphism */
@@ -566,61 +568,67 @@
   .logo-text { font-size: 0.85rem; }
   .logo-icon { width: 34px; height: 34px; min-width: 34px; border-radius: 10px; }
 
-  /* Slightly smaller action buttons to fit more items */
+  /* Slightly smaller action buttons */
   .action-btn, .cart-btn, .mobile-menu-btn {
     width: 36px;
     height: 36px;
     min-width: 36px;
   }
 
-  /* Always show: lang + cart + bell + profile + hamburger */
-  .action-btn.notif-btn,
-  .cart-btn,
-  .mobile-menu-btn { display: flex; }
+  .profile-chip { max-width: 36px; padding: 0.15rem; }
+  .header-avatar { width: 28px; height: 28px; min-width: 28px; }
 }
 
 /* ≤360px (Samsung Galaxy A10e): show everything, just smaller */
 @media (max-width: 360px) {
-  /* Keep the notification bell — do NOT hide it */
-  .notif-wrap { display: block; }
+  /* Keep the notification bell — display:flex so the button renders correctly */
+  .notif-wrap { display: flex; align-items: center; }
 
   .header-container {
-    padding-inline: 0.4rem;
-    gap: 0.15rem;
+    padding-inline: 0.35rem;
+    gap: 0.12rem;
   }
 
-  /* Hide logo text to free space */
-  .logo-text  { display: none; }
-  .logo-icon  { width: 32px; height: 32px; min-width: 32px; border-radius: 9px; }
+  /* Keep logo text visible but smaller */
+  .logo-text {
+    display: block;
+    font-size: 0.72rem;
+    max-width: 62px;
+  }
 
-  /* Smaller buttons to fit everything in 360px */
+  .logo-icon { width: 28px; height: 28px; min-width: 28px; border-radius: 8px; }
+  .logo { gap: 0.3rem; }
+
+  /* Shrink all buttons to 30px to fit in 360px */
   .action-btn, .cart-btn, .mobile-menu-btn {
-    width: 34px;
-    height: 34px;
-    min-width: 34px;
-    border-radius: 9px;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    border-radius: 8px;
   }
 
   .profile-chip {
-    width: 34px;
-    height: 34px;
-    max-width: 34px;
+    width: 30px;
+    height: 30px;
+    max-width: 30px;
     padding: 0.1rem;
   }
 
   .header-avatar {
-    width: 26px;
-    height: 26px;
-    min-width: 26px;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
   }
 
   /* Language switcher: extra compact */
   .lang-btn {
-    min-width: 24px;
-    min-height: 24px;
-    padding: 0.2rem 0.35rem;
-    font-size: 0.65rem;
+    min-width: 22px;
+    min-height: 26px;
+    padding: 0.18rem 0.32rem;
+    font-size: 0.62rem;
   }
+
+  .lang-switcher { gap: 0.15rem; padding: 0.1rem; }
 }
 
 /* ════════════════════════════════════════════════════════
@@ -652,13 +660,15 @@
   position: fixed;
   inset: 0;
   z-index: 998;
+  background: transparent;
 }
 
 .notif-dropdown {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  z-index: 999;
+  /* Must be above the header (z-index:1000) */
+  z-index: 1001;
   width: clamp(270px, 90vw, 340px);
   max-height: min(440px, 80vh);
   background: #ffffff;
@@ -670,8 +680,9 @@
   flex-direction: column;
 }
 
-@media (max-width: 480px) { .notif-dropdown { right: -2rem; } }
-@media (max-width: 360px) { .notif-dropdown { right: -3rem; } }
+/* On small screens keep dropdown inside the viewport — don't push it off-screen */
+@media (max-width: 480px) { .notif-dropdown { right: 0; } }
+@media (max-width: 360px) { .notif-dropdown { right: 0; width: min(310px, 95vw); } }
 
 .notif-header {
   display: flex;
